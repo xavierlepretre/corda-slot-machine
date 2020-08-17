@@ -1,3 +1,4 @@
+include 'clients'
 include 'contracts'
 include 'workflows'
 
