@@ -1,0 +1,1 @@
+Empty project on which to start coding the slot machine.
