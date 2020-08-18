@@ -1,12 +1,36 @@
 package com.cordacodeclub.states
 
+import com.cordacodeclub.contracts.CommitContract
+import net.corda.core.contracts.BelongsToContract
 import net.corda.core.contracts.ContractState
+import net.corda.core.contracts.LinearState
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.AbstractParty
 import net.corda.core.serialization.CordaSerializable
 
-data class CommitState(val hash: SecureHash, val creator: AbstractParty) : ContractState {
-    override val participants: List<AbstractParty> = listOf(creator)
+@BelongsToContract(CommitContract::class)
+data class CommittedState(
+        val hash: SecureHash,
+        val creator: AbstractParty,
+        override val linearId: UniqueIdentifier,
+        override val participants: List<AbstractParty> = listOf(creator)
+) : LinearState {
+    init {
+        require(participants.contains(creator)) { "The creator must be a participant" }
+    }
+}
+
+@BelongsToContract(CommitContract::class)
+data class RevealedState(
+        val image: CommitImage,
+        val creator: AbstractParty,
+        override val linearId: UniqueIdentifier,
+        override val participants: List<AbstractParty> = listOf(creator)
+) : LinearState {
+    init {
+        require(participants.contains(creator)) { "The creator must be a participant" }
+    }
 }
 
 @CordaSerializable
