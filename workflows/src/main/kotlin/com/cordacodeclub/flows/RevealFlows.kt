@@ -7,6 +7,7 @@ import com.cordacodeclub.states.CommitImage
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.RevealedState
 import net.corda.core.contracts.StateAndRef
+import net.corda.core.contracts.TimeWindow
 import net.corda.core.flows.FinalityFlow
 import net.corda.core.flows.FlowLogic
 import net.corda.core.flows.FlowSession
@@ -15,6 +16,7 @@ import net.corda.core.identity.AbstractParty
 import net.corda.core.node.StatesToRecord
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
+import java.time.Instant
 
 object RevealFlows {
 
@@ -26,6 +28,7 @@ object RevealFlows {
     class Initiator(
             val committedRef: StateAndRef<CommittedState>,
             val image: CommitImage,
+            val revealDeadline: Instant,
             val otherParticipants: List<AbstractParty>,
             val otherSessions: Collection<FlowSession>) : FlowLogic<SignedTransaction>() {
 
@@ -38,6 +41,7 @@ object RevealFlows {
                             RevealedState(image, committed.creator, committed.linearId, otherParticipants),
                             CommitContract.id)
                     .addCommand(Reveal(0, 0))
+                    .setTimeWindow(TimeWindow.untilOnly(revealDeadline))
 
             builder.verify(serviceHub)
 
