@@ -4,6 +4,7 @@ import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Commit
 import com.cordacodeclub.states.CommittedState
 import net.corda.core.contracts.Command
+import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.crypto.SecureHash
 import net.corda.core.flows.*
@@ -12,6 +13,7 @@ import net.corda.core.node.StatesToRecord
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.unwrap
+import java.time.Instant
 
 object CommitFlows {
 
@@ -23,6 +25,7 @@ object CommitFlows {
     class Initiator(
             val playerHash: SecureHash,
             val player: AbstractParty,
+            val commitDeadline: Instant,
             val casinoSession: FlowSession,
             val casino: AbstractParty) : FlowLogic<SignedTransaction>() {
 
@@ -40,6 +43,7 @@ object CommitFlows {
                     .addCommand(Command(Commit(0), player.owningKey))
                     .addOutputState(CommittedState(casinoHash, casino, UniqueIdentifier(), listOf(player, casino)))
                     .addCommand(Command(Commit(1), casino.owningKey))
+                    .setTimeWindow(TimeWindow.untilOnly(commitDeadline))
 
             builder.verify(serviceHub)
 
@@ -57,6 +61,7 @@ object CommitFlows {
      */
     class Responder(
             val playerSession: FlowSession,
+            val commitDeadline: Instant,
             val casinoHash: SecureHash,
             val casino: AbstractParty) : FlowLogic<SignedTransaction>() {
 
@@ -89,6 +94,9 @@ object CommitFlows {
                         throw FlowException("My commit state should be for casino")
                     if (myCommitState.hash != casinoHash)
                         throw FlowException("My commit state should have the hash I sent")
+
+                    if (stx.tx.timeWindow != TimeWindow.untilOnly(commitDeadline))
+                        throw FlowException("The time-window is incorrect")
 
                 }
 
