@@ -5,7 +5,7 @@ import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.core.TestIdentity
 import org.junit.Test
-import kotlin.test.assertEquals
+import java.util.*
 import kotlin.test.assertFailsWith
 
 class CommitStatesTests {
@@ -14,20 +14,7 @@ class CommitStatesTests {
     private val alice = aliceId.identity.party
     private val bobId = TestIdentity(CordaX500Name("Bob", "Paris", "FR"))
     private val bob = bobId.identity.party
-
-    @Test
-    fun `all bits are in the CommitImage hash`() {
-        val leftMostBit = 0x4000000000000000L
-        val allHashes = mutableSetOf<SecureHash>()
-
-        for (i in 0..63) {
-            allHashes.add(CommitImage(0L, leftMostBit shr i).hash)
-            allHashes.add(CommitImage(leftMostBit shr i, 0L).hash)
-        }
-
-        // The 0, 0 was duplicated.
-        assertEquals(127, allHashes.size)
-    }
+    private val random = Random()
 
     @Test
     fun `CommittedState creator must be in the participants`() {
@@ -43,12 +30,12 @@ class CommitStatesTests {
     @Test
     fun `RevealedState creator must be in the participants`() {
         assertFailsWith<IllegalArgumentException>() {
-            RevealedState(CommitImage(0L, 1L), alice, UniqueIdentifier(), listOf())
+            RevealedState(CommitImage.createRandom(random), alice, UniqueIdentifier(), listOf())
         }
         assertFailsWith<IllegalArgumentException>() {
-            RevealedState(CommitImage(0L, 1L), alice, UniqueIdentifier(), listOf(bob))
+            RevealedState(CommitImage.createRandom(random), alice, UniqueIdentifier(), listOf(bob))
         }
-        RevealedState(CommitImage(0L, 1L), alice, UniqueIdentifier(), listOf(alice))
+        RevealedState(CommitImage.createRandom(random), alice, UniqueIdentifier(), listOf(alice))
     }
 
 }

@@ -13,6 +13,7 @@ import net.corda.testing.core.TestIdentity
 import net.corda.testing.node.MockServices
 import net.corda.testing.node.transaction
 import org.junit.Test
+import java.util.*
 
 class CommitContractTests {
 
@@ -21,6 +22,7 @@ class CommitContractTests {
     private val casino = casinoId.identity.party
     private val playerId = TestIdentity(CordaX500Name("Player", "Paris", "FR"))
     private val player = playerId.identity.party
+    private val random = Random()
 
     @Test
     fun `Commit command needs a Committed state output`() {
@@ -71,7 +73,7 @@ class CommitContractTests {
 
     @Test
     fun `Reveal command needs a Committed state input`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id = UniqueIdentifier()
         ledgerServices.transaction {
             output(CommitContract.id, RevealedState(image, casino, id))
@@ -90,7 +92,7 @@ class CommitContractTests {
 
     @Test
     fun `Reveal command needs a Revealed state output`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id = UniqueIdentifier()
         ledgerServices.transaction {
             input(CommitContract.id, CommittedState(image.hash, casino, id))
@@ -109,7 +111,7 @@ class CommitContractTests {
 
     @Test
     fun `Reveal command needs matching ids`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
         val id2 = UniqueIdentifier()
         ledgerServices.transaction {
@@ -131,7 +133,7 @@ class CommitContractTests {
 
     @Test
     fun `Reveal command needs correct image`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
         ledgerServices.transaction {
             output(CommitContract.id, RevealedState(image, casino, id1))
@@ -149,7 +151,7 @@ class CommitContractTests {
 
     @Test
     fun `Reveal command leaves creator unchanged`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
         ledgerServices.transaction {
             output(CommitContract.id, RevealedState(image, casino, id1))
@@ -167,7 +169,7 @@ class CommitContractTests {
 
     @Test
     fun `Reveal command can be signed by anyone`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
         ledgerServices.transaction {
             input(CommitContract.id, CommittedState(image.hash, casino, id1))
@@ -185,7 +187,7 @@ class CommitContractTests {
 
     @Test
     fun `Use command needs a Revealed state input`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         ledgerServices.transaction {
             input(CommitContract.id, RevealedState(image, casino, UniqueIdentifier()))
             input(DummyContract.PROGRAM_ID, DummyState())
@@ -202,7 +204,7 @@ class CommitContractTests {
 
     @Test
     fun `Use command needs the creator to be a signer`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         ledgerServices.transaction {
             input(CommitContract.id, RevealedState(image, casino, UniqueIdentifier()))
 
