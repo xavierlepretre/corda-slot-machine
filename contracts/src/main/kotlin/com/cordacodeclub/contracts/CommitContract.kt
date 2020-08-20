@@ -20,6 +20,7 @@ class CommitContract : Contract {
             when (command.value) {
                 is Commands.Commit -> verifyCommit(tx, command.value as Commands.Commit, command.signers)
                 is Commands.Reveal -> verifyReveal(tx, command.value as Commands.Reveal, command.signers)
+                is Commands.Use -> verifyUse(tx, command.value as Commands.Use, command.signers)
             }
         }
 
@@ -51,9 +52,19 @@ class CommitContract : Contract {
         }
     }
 
+    private fun verifyUse(tx: LedgerTransaction, use: Commands.Use, signers: List<PublicKey>) {
+        requireThat {
+            "The input must be a RevealedState" using (tx.inputs[use.inputIndex].state.data is RevealedState)
+            val revealedState = tx.inputs[use.inputIndex].state.data as RevealedState
+
+            "The creator must sign" using signers.contains(revealedState.creator.owningKey)
+        }
+    }
+
     sealed class Commands : CommandData {
         class Commit(val outputIndex: Int) : Commands()
         class Reveal(val inputIndex: Int, val outputIndex: Int) : Commands()
+        class Use(val inputIndex: Int) : Commands()
     }
 
 }

@@ -1,7 +1,6 @@
 package com.cordacodeclub.contracts
 
-import com.cordacodeclub.contracts.CommitContract.Commands.Commit
-import com.cordacodeclub.contracts.CommitContract.Commands.Reveal
+import com.cordacodeclub.contracts.CommitContract.Commands.*
 import com.cordacodeclub.states.CommitImage
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.RevealedState
@@ -186,5 +185,37 @@ class CommitContractTests {
         }
     }
 
+    @Test
+    fun `Use command needs a Revealed state input`() {
+        val image = CommitImage(0L, 1L)
+        ledgerServices.transaction {
+            input(CommitContract.id, RevealedState(image, alice, UniqueIdentifier()))
+            input(DummyContract.PROGRAM_ID, DummyState())
+
+            tweak {
+                command(alice.owningKey, Use(1))
+                failsWith("The input must be a RevealedState")
+            }
+
+            command(alice.owningKey, Use( 0))
+            verifies()
+        }
+    }
+
+    @Test
+    fun `Use command needs the creator to be a signer`() {
+        val image = CommitImage(0L, 1L)
+        ledgerServices.transaction {
+            input(CommitContract.id, RevealedState(image, alice, UniqueIdentifier()))
+
+            tweak {
+                command(bob.owningKey, Use(0))
+                failsWith("The creator must sign")
+            }
+
+            command(alice.owningKey, Use( 0))
+            verifies()
+        }
+    }
 
 }
