@@ -1,0 +1,67 @@
+body {
+	background: url(../img/template2/main_bg.png) top center no-repeat;
+}
+.slot_machine_outer_container { background: transparent url(../img/template2/main_bg_machine.png) top center no-repeat; }
+.slot_machine_outer_container.won .slot_machine_win_bg {
+	background: transparent url(../img/template2/won_bg.png) 294px 186px no-repeat;
+}
+
+.slot_machine_container { width: 464px; height: 415px; left: 286px; top: 290px; }
+
+.slot_machine_container .slot_machine_spin_button {
+	left: 342px; top: 335px; width: 127px; height: 80px;
+	background: transparent url(../img/template2/spin_button.png) 0 0 no-repeat;
+}
+
+.slot_machine_container .slot_machine_controls { top: 347px; left: 0; width: 355px; height: 65px; }
+.slot_machine_container .slot_machine_controls span { top: 30px; }
+.slot_machine_container .slot_machine_controls .slot_machine_output_last_win { left: 16px;  }
+.slot_machine_container .slot_machine_controls .slot_machine_output_balance { left: 138px; }
+.slot_machine_container .slot_machine_controls .slot_machine_output_bet { left: 249px; width: 34px; }
+.slot_machine_container .slot_machine_controls .slot_machine_output_day_winnings { display: none; }
+.slot_machine_container .slot_machine_controls .slot_machine_output_lifetime_winnings { display: none; }
+
+.slot_machine_container .slot_machine_controls .slot_machine_bet_increase_button,
+.slot_machine_container .slot_machine_controls .slot_machine_bet_decrease_button {
+	width: 27px; height: 42px; left: 316px; top: 13px;
+	background: transparent url(../img/template2/sprites.png) 0 0 no-repeat;
+}
+.slot_machine_container .slot_machine_controls .slot_machine_bet_decrease_button { top: 35px; background-position: 0 -50px; }
+
+.slot_machine_container .slot_machine_reel_container { top: 14px; }
+
+.slot_machine_container .slot_machine_reel_container .reel_overlay {
+	background: transparent url(../img/template2/reel_overlay.png) 0 center no-repeat;
+}
+
+.slot_machine_container .slot_machine_reel_container .slot_machine_reel {
+	height: 2160px; /* set the height to 3 * the strip PNG height */
+	background: transparent url(../img/template2/reel_strip.png) 0 0 repeat-y;
+}
+
+.slot_machine_sound_toggle_button { display: none; }
+
+.slot_machine_prizes_list { top: 265px; left: 30px; width: 206px; }
+.slot_machine_prizes_list .slot_machine_prize_row {
+	padding-left: 9px; margin-top: -13px; /* we make each row much taller than it is, to accomodate the glow of the winning orange band */
+	height: 55px;
+}
+.slot_machine_prizes_list .slot_machine_prize_reel_sprites { padding-top: 12px; }
+.slot_machine_prizes_list .slot_machine_prize_payout { padding: 21px 5px 0 0; width: 62px; }
+.slot_machine_prizes_list .slot_machine_prize_row.won { background: transparent url(../img/template2/prize_won.png) 50% 0 no-repeat; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon { background: transparent url(../img/template2/prizes_sprites.png) top left no-repeat; }
+
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_1 { background-position: 0 0; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_2 { background-position: -30px 0; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_3 { background-position: -60px 0; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_4 { background-position: -90px 0; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_5 { background-position: -120px 0; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_6 { background-position: -150px 0; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_stardot5 { background-position: -180px 0; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_1slash3slash5 { background-position: -0px -30px; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_2slash4slash6 { background-position: -30px -30px; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_1slash3 { background-position: -60px -30px; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_5slash2 { background-position: -90px -30px; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_4slash6 { background-position: -120px -30px; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_1slash5 { background-position: -150px -30px; }
+.slot_machine_prizes_list .slot_machine_prize_reel_icon.prize_2slash3 { background-position: -180px -30px; }

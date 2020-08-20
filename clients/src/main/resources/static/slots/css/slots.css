@@ -1,0 +1,103 @@
+html, body {
+	margin: 0; padding: 0;
+	font-family:"Helvetica",Arial,"Arial Bold";
+}
+.clearer { clear: both; height: 0; margin: 0; padding: 0; font-size: 0; line-height: 0; }
+a img { border: none; }
+
+
+.slot_machine_outer_container,
+.slot_machine_win_bg {
+	width: 880px; height: 800px;
+	position: relative;
+}
+
+.slot_machine_outer_container {
+	margin: 0 auto;
+}
+.slot_machine_outer_container.won .slot_machine_win_bg {
+}
+
+/*---------*/
+
+.slot_machine_container {
+	position: absolute;
+}
+
+.slot_machine_container .slot_machine_spin_button {
+	position: absolute; cursor: pointer;
+}
+.slot_machine_container .slot_machine_spin_button:hover { background-position: 0 -100px; }
+.slot_machine_container .slot_machine_spin_button:active { background-position: 0 -200px; }
+.slot_machine_container .slot_machine_spin_button.disabled { background-position: 0 -300px; }
+
+.slot_machine_container .slot_machine_controls {
+	position: absolute;
+}
+.slot_machine_container .slot_machine_controls span {
+	display: block; position: absolute; text-align: right;
+	width: 80px; height: 25px;
+	color: #e64e13; font-weight: bold; font-size: 23px;
+}
+
+.slot_machine_container .slot_machine_controls .slot_machine_bet_increase_button,
+.slot_machine_container .slot_machine_controls .slot_machine_bet_decrease_button {
+	position: absolute;
+	cursor: pointer;
+}
+
+.slot_machine_container .slot_machine_logged_out_message,
+.slot_machine_container .slot_machine_failed_request_message {
+	position: absolute;
+	top: 104px; left: 42px; width: 355px;
+	z-index: 1000;
+	padding: 10px; text-align: center;
+	background-color: red; color: white;
+}
+
+/*---------*/
+
+.slot_machine_container .slot_machine_reel_container {
+	position: absolute;
+	left: 13px; top: 14px; width: 435px; height: 283px;
+	overflow: hidden;
+}
+
+.slot_machine_container .slot_machine_reel_container .reel_overlay {
+	position: absolute; top: 0; left:0; right: 0; bottom: 0;
+	z-index: 100;
+}
+
+.slot_machine_container .slot_machine_reel_container .slot_machine_reel {
+	position: absolute;
+	width: 121px; height: 2160px; /* set the height to 3 * the strip PNG height */
+}
+
+.slot_machine_container .slot_machine_reel_container .slot_machine_reel1 { left: 10px; top: -1360px; }
+.slot_machine_container .slot_machine_reel_container .slot_machine_reel2 { left: 158px; top: -992px; }
+.slot_machine_container .slot_machine_reel_container .slot_machine_reel3 { left: 304px; top: -1116px; }
+
+/*----------*/
+
+ .slot_machine_sound_toggle_button {
+	position: absolute;
+	width: 32px; height: 32px;
+	cursor: pointer;
+}
+
+ .slot_machine_sound_toggle_button.off { background-position: -50px 0; }
+
+/*---------*/
+
+.slot_machine_prizes_list { position: absolute; height: auto; }
+.slot_machine_prizes_list .slot_machine_prize_row {}
+.slot_machine_prizes_list .slot_machine_prize_reel_sprites { float: left; clear: both; }
+.slot_machine_prizes_list .slot_machine_prize_payout { float: left; text-align: right; }
+
+.slot_machine_prizes_list .slot_machine_prize_row.won { }
+.slot_machine_prizes_list .slot_machine_prize_row.won .slot_machine_prize_payout { font-weight: bold; }
+
+.slot_machine_prizes_list .slot_machine_prize_reel_sprites div.slot_machine_prize_reel_icon {
+	width: 30px; height: 30px; float: left; margin: 0 5px;
+	background-repeat: no-repeat;
+}

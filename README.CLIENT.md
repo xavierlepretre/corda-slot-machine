@@ -66,3 +66,25 @@ https://github.com/corda/samples-kotlin/blob/master/Basic/spring-webserver/READM
 which says how to start it without Gradle,
 i.e. by building and running a JAR,
 or by using an IntelliJ run configuration.
+
+## Source code
+
+The slot machine UI is third-party `slots_v2.0.0.zip` which contains:
+
+- A `readme.html`
+- Web application server source code written in PHP
+- JavaScript (an in-browser front-end)
+- Image files and CSS
+- SQL files
+
+To integrate this we:
+
+- Discard the PHP and SQL code
+- Keep the front end JavaScript, CSS and Images (preferably unaltered)
+- Reimplement the webserver using Spring Boot
+- Delegate to RPC end points for the back end
+- Move Game logic into the CorDapp contract, especially calculating payout values
+
+The `readme.html` is [located here](./clients/readme.html) where it won't be seen by end-users.
+It contains interesting details about how to customise the game.
+I didn't archive the original `slots_v2.0.0.zip` in this repository.
