@@ -26,6 +26,7 @@ object CommitFlows {
             val playerHash: SecureHash,
             val player: AbstractParty,
             val commitDeadline: Instant,
+            val revealDeadline: Instant,
             val casinoSession: FlowSession,
             val casino: AbstractParty) : FlowLogic<SignedTransaction>() {
 
@@ -39,9 +40,11 @@ object CommitFlows {
             // First notary, not caring much...
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
             val builder = TransactionBuilder(notary)
-                    .addOutputState(CommittedState(playerHash, player, UniqueIdentifier(), listOf(player, casino)))
+                    .addOutputState(CommittedState(playerHash, player, revealDeadline,
+                            UniqueIdentifier(), listOf(player, casino)))
                     .addCommand(Command(Commit(0), player.owningKey))
-                    .addOutputState(CommittedState(casinoHash, casino, UniqueIdentifier(), listOf(player, casino)))
+                    .addOutputState(CommittedState(casinoHash, casino, revealDeadline,
+                            UniqueIdentifier(), listOf(player, casino)))
                     .addCommand(Command(Commit(1), casino.owningKey))
                     .setTimeWindow(TimeWindow.untilOnly(commitDeadline))
 
@@ -62,6 +65,7 @@ object CommitFlows {
     class Responder(
             val playerSession: FlowSession,
             val commitDeadline: Instant,
+            val revealDeadline: Instant,
             val casinoHash: SecureHash,
             val casino: AbstractParty) : FlowLogic<SignedTransaction>() {
 
@@ -94,6 +98,9 @@ object CommitFlows {
                         throw FlowException("My commit state should be for casino")
                     if (myCommitState.hash != casinoHash)
                         throw FlowException("My commit state should have the hash I sent")
+
+                    if (stx.tx.outputsOfType(CommittedState::class.java).any { it.revealDeadline != revealDeadline })
+                        throw FlowException("One CommittedState does not have the correct reveal deadline")
 
                     if (stx.tx.timeWindow != TimeWindow.untilOnly(commitDeadline))
                         throw FlowException("The time-window is incorrect")

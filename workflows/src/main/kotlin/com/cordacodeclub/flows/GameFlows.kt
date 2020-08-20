@@ -42,7 +42,7 @@ object GameFlows {
 
             // Player asks casino for commit and prepares double commits
             val commitTx = subFlow(CommitFlows.Initiator(
-                    playerImage.hash, player, commitDeadline, casinoSession, casino))
+                    playerImage.hash, player, commitDeadline, revealDeadline, casinoSession, casino))
             val commitStates = commitTx.tx.outRefsOfType<CommittedState>()
             val playerCommit = commitStates.single { it.state.data.creator == player }
 
@@ -79,7 +79,7 @@ object GameFlows {
 
             // Casino gives commit info and gets both commits tx.
             val commitTx = subFlow(CommitFlows.Responder(
-                    playerSession, commitDeadline, casinoImage.hash, casino))
+                    playerSession, commitDeadline, revealDeadline, casinoImage.hash, casino))
             val commitStates = commitTx.tx.outRefsOfType<CommittedState>()
             val casinoCommit = commitStates.single { it.state.data.creator == casino }
 
