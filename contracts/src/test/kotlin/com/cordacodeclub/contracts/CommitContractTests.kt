@@ -4,6 +4,7 @@ import com.cordacodeclub.contracts.CommitContract.Commands.*
 import com.cordacodeclub.states.CommitImage
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.RevealedState
+import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.CordaX500Name
@@ -13,6 +14,8 @@ import net.corda.testing.core.TestIdentity
 import net.corda.testing.node.MockServices
 import net.corda.testing.node.transaction
 import org.junit.Test
+import java.time.Duration
+import java.time.Instant
 import java.util.*
 
 class CommitContractTests {
@@ -27,7 +30,7 @@ class CommitContractTests {
     @Test
     fun `Commit command needs a Committed state output`() {
         ledgerServices.transaction {
-            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino, UniqueIdentifier()))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino, Instant.now(), UniqueIdentifier()))
             output(DummyContract.PROGRAM_ID, DummyState())
 
             tweak {
@@ -43,7 +46,7 @@ class CommitContractTests {
     @Test
     fun `Commit command needs the creator to be a signer`() {
         ledgerServices.transaction {
-            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino, UniqueIdentifier()))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino, Instant.now(), UniqueIdentifier()))
 
             tweak {
                 command(player.owningKey, Commit(0))
@@ -63,8 +66,8 @@ class CommitContractTests {
     @Test
     fun `Commit command works`() {
         ledgerServices.transaction {
-            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino, UniqueIdentifier()))
-            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player, UniqueIdentifier()))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino, Instant.now(), UniqueIdentifier()))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player, Instant.now(), UniqueIdentifier()))
             command(casino.owningKey, Commit(0))
             command(player.owningKey, Commit(1))
             verifies()
@@ -75,10 +78,12 @@ class CommitContractTests {
     fun `Reveal command needs a Committed state input`() {
         val image = CommitImage.createRandom(random)
         val id = UniqueIdentifier()
+        val goodDeadline = Instant.now().plus(Duration.ofMinutes(1))
         ledgerServices.transaction {
             output(CommitContract.id, RevealedState(image, casino, id))
-            input(CommitContract.id, CommittedState(image.hash, casino, id))
+            input(CommitContract.id, CommittedState(image.hash, casino, goodDeadline, id))
             input(DummyContract.PROGRAM_ID, DummyState())
+            timeWindow(TimeWindow.untilOnly(goodDeadline))
 
             tweak {
                 command(casino.owningKey, Reveal(1, 0))
@@ -94,10 +99,12 @@ class CommitContractTests {
     fun `Reveal command needs a Revealed state output`() {
         val image = CommitImage.createRandom(random)
         val id = UniqueIdentifier()
+        val goodDeadline = Instant.now().plus(Duration.ofMinutes(1))
         ledgerServices.transaction {
-            input(CommitContract.id, CommittedState(image.hash, casino, id))
+            input(CommitContract.id, CommittedState(image.hash, casino, goodDeadline, id))
             output(CommitContract.id, RevealedState(image, casino, id))
             output(DummyContract.PROGRAM_ID, DummyState())
+            timeWindow(TimeWindow.untilOnly(goodDeadline))
 
             tweak {
                 command(casino.owningKey, Reveal(0, 1))
@@ -114,12 +121,14 @@ class CommitContractTests {
         val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
         val id2 = UniqueIdentifier()
+        val goodDeadline = Instant.now().plus(Duration.ofMinutes(1))
         ledgerServices.transaction {
-            input(CommitContract.id, CommittedState(image.hash, casino, id1))
-            input(CommitContract.id, CommittedState(image.hash, casino, id2))
+            input(CommitContract.id, CommittedState(image.hash, casino, goodDeadline, id1))
+            input(CommitContract.id, CommittedState(image.hash, casino, goodDeadline, id2))
             output(CommitContract.id, RevealedState(image, casino, id1))
             command(casino.owningKey, Reveal(0, 0))
             command(casino.owningKey, Reveal(1, 1))
+            timeWindow(TimeWindow.untilOnly(goodDeadline))
 
             tweak {
                 output(CommitContract.id, RevealedState(image, casino, id1))
@@ -135,16 +144,18 @@ class CommitContractTests {
     fun `Reveal command needs correct image`() {
         val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
+        val goodDeadline = Instant.now().plus(Duration.ofMinutes(1))
         ledgerServices.transaction {
             output(CommitContract.id, RevealedState(image, casino, id1))
             command(casino.owningKey, Reveal(0, 0))
+            timeWindow(TimeWindow.untilOnly(goodDeadline))
 
             tweak {
-                input(CommitContract.id, CommittedState(SecureHash.allOnesHash, casino, id1))
+                input(CommitContract.id, CommittedState(SecureHash.allOnesHash, casino, goodDeadline, id1))
                 failsWith("The commit image must match")
             }
 
-            input(CommitContract.id, CommittedState(image.hash, casino, id1))
+            input(CommitContract.id, CommittedState(image.hash, casino, goodDeadline, id1))
             verifies()
         }
     }
@@ -153,16 +164,43 @@ class CommitContractTests {
     fun `Reveal command leaves creator unchanged`() {
         val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
+        val goodDeadline = Instant.now().plus(Duration.ofMinutes(1))
         ledgerServices.transaction {
+            output(CommitContract.id, RevealedState(image, casino, id1))
+            command(casino.owningKey, Reveal(0, 0))
+            timeWindow(TimeWindow.untilOnly(goodDeadline))
+
+            tweak {
+                input(CommitContract.id, CommittedState(image.hash, player, goodDeadline, id1))
+                failsWith("The creator must be unchanged")
+            }
+
+            input(CommitContract.id, CommittedState(image.hash, casino, goodDeadline, id1))
+            verifies()
+        }
+    }
+
+    @Test
+    fun `Reveal command needs a correct TimeWindow`() {
+        val image = CommitImage.createRandom(random)
+        val id1 = UniqueIdentifier()
+        val goodDeadline = Instant.now().plus(Duration.ofMinutes(1))
+        ledgerServices.transaction {
+            input(CommitContract.id, CommittedState(image.hash, casino, goodDeadline, id1))
             output(CommitContract.id, RevealedState(image, casino, id1))
             command(casino.owningKey, Reveal(0, 0))
 
             tweak {
-                input(CommitContract.id, CommittedState(image.hash, player, id1))
-                failsWith("The creator must be unchanged")
+                timeWindow(TimeWindow.untilOnly(goodDeadline.minusSeconds(1)))
+                verifies()
             }
 
-            input(CommitContract.id, CommittedState(image.hash, casino, id1))
+            tweak {
+                timeWindow(TimeWindow.untilOnly(goodDeadline.plusSeconds(1)))
+                failsWith("The reveal deadline must be satisfied")
+            }
+
+            timeWindow(TimeWindow.untilOnly(goodDeadline))
             verifies()
         }
     }
@@ -171,9 +209,11 @@ class CommitContractTests {
     fun `Reveal command can be signed by anyone`() {
         val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
+        val goodDeadline = Instant.now().plus(Duration.ofMinutes(1))
         ledgerServices.transaction {
-            input(CommitContract.id, CommittedState(image.hash, casino, id1))
+            input(CommitContract.id, CommittedState(image.hash, casino, goodDeadline, id1))
             output(CommitContract.id, RevealedState(image, casino, id1))
+            timeWindow(TimeWindow.untilOnly(goodDeadline))
 
             tweak {
                 command(player.owningKey, Reveal(0, 0))

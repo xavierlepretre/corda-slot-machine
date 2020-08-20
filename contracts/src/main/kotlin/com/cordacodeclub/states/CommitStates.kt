@@ -8,12 +8,14 @@ import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.AbstractParty
 import net.corda.core.serialization.CordaSerializable
 import java.math.BigInteger
+import java.time.Instant
 import java.util.*
 
 @BelongsToContract(CommitContract::class)
 data class CommittedState(
         val hash: SecureHash,
         val creator: AbstractParty,
+        val revealDeadline: Instant,
         override val linearId: UniqueIdentifier,
         override val participants: List<AbstractParty> = listOf(creator)
 ) : LinearState {
