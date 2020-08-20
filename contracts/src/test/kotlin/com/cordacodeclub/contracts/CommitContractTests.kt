@@ -13,29 +13,29 @@ import net.corda.testing.core.TestIdentity
 import net.corda.testing.node.MockServices
 import net.corda.testing.node.transaction
 import org.junit.Test
+import java.util.*
 
 class CommitContractTests {
 
     private val ledgerServices = MockServices(listOf("com.cordacodeclub.contracts", "net.corda.testing.contracts"))
-    private val aliceId = TestIdentity(CordaX500Name("Alice", "London", "GB"))
-    private val alice = aliceId.identity.party
-    private val bobId = TestIdentity(CordaX500Name("Bob", "Paris", "FR"))
-    private val bob = bobId.identity.party
-    private val carolId = TestIdentity(CordaX500Name("Carol", "Rotterdam", "NL"))
-    private val carol = carolId.identity.party
+    private val casinoId = TestIdentity(CordaX500Name("Casino", "London", "GB"))
+    private val casino = casinoId.identity.party
+    private val playerId = TestIdentity(CordaX500Name("Player", "Paris", "FR"))
+    private val player = playerId.identity.party
+    private val random = Random()
 
     @Test
     fun `Commit command needs a Committed state output`() {
         ledgerServices.transaction {
-            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), alice, UniqueIdentifier()))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino, UniqueIdentifier()))
             output(DummyContract.PROGRAM_ID, DummyState())
 
             tweak {
-                command(alice.owningKey, Commit(1))
+                command(casino.owningKey, Commit(1))
                 failsWith("The output must be a CommitState")
             }
 
-            command(alice.owningKey, Commit(0))
+            command(casino.owningKey, Commit(0))
             verifies()
         }
     }
@@ -43,19 +43,19 @@ class CommitContractTests {
     @Test
     fun `Commit command needs the creator to be a signer`() {
         ledgerServices.transaction {
-            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), alice, UniqueIdentifier()))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino, UniqueIdentifier()))
 
             tweak {
-                command(bob.owningKey, Commit(0))
+                command(player.owningKey, Commit(0))
                 failsWith("The creator must sign")
             }
 
             tweak {
-                command(listOf(alice.owningKey, bob.owningKey), Commit(0))
+                command(listOf(casino.owningKey, player.owningKey), Commit(0))
                 verifies()
             }
 
-            command(alice.owningKey, Commit(0))
+            command(casino.owningKey, Commit(0))
             verifies()
         }
     }
@@ -63,157 +63,157 @@ class CommitContractTests {
     @Test
     fun `Commit command works`() {
         ledgerServices.transaction {
-            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), alice, UniqueIdentifier()))
-            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), bob, UniqueIdentifier()))
-            command(alice.owningKey, Commit(0))
-            command(bob.owningKey, Commit(1))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino, UniqueIdentifier()))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player, UniqueIdentifier()))
+            command(casino.owningKey, Commit(0))
+            command(player.owningKey, Commit(1))
             verifies()
         }
     }
 
     @Test
     fun `Reveal command needs a Committed state input`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id = UniqueIdentifier()
         ledgerServices.transaction {
-            output(CommitContract.id, RevealedState(image, alice, id))
-            input(CommitContract.id, CommittedState(image.hash, alice, id))
+            output(CommitContract.id, RevealedState(image, casino, id))
+            input(CommitContract.id, CommittedState(image.hash, casino, id))
             input(DummyContract.PROGRAM_ID, DummyState())
 
             tweak {
-                command(alice.owningKey, Reveal(1, 0))
+                command(casino.owningKey, Reveal(1, 0))
                 failsWith("The input must be a CommittedState")
             }
 
-            command(alice.owningKey, Reveal(0, 0))
+            command(casino.owningKey, Reveal(0, 0))
             verifies()
         }
     }
 
     @Test
     fun `Reveal command needs a Revealed state output`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id = UniqueIdentifier()
         ledgerServices.transaction {
-            input(CommitContract.id, CommittedState(image.hash, alice, id))
-            output(CommitContract.id, RevealedState(image, alice, id))
+            input(CommitContract.id, CommittedState(image.hash, casino, id))
+            output(CommitContract.id, RevealedState(image, casino, id))
             output(DummyContract.PROGRAM_ID, DummyState())
 
             tweak {
-                command(alice.owningKey, Reveal(0, 1))
+                command(casino.owningKey, Reveal(0, 1))
                 failsWith("The output must be a RevealedState")
             }
 
-            command(alice.owningKey, Reveal(0, 0))
+            command(casino.owningKey, Reveal(0, 0))
             verifies()
         }
     }
 
     @Test
     fun `Reveal command needs matching ids`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
         val id2 = UniqueIdentifier()
         ledgerServices.transaction {
-            input(CommitContract.id, CommittedState(image.hash, alice, id1))
-            input(CommitContract.id, CommittedState(image.hash, alice, id2))
-            output(CommitContract.id, RevealedState(image, alice, id1))
-            command(alice.owningKey, Reveal(0, 0))
-            command(alice.owningKey, Reveal(1, 1))
+            input(CommitContract.id, CommittedState(image.hash, casino, id1))
+            input(CommitContract.id, CommittedState(image.hash, casino, id2))
+            output(CommitContract.id, RevealedState(image, casino, id1))
+            command(casino.owningKey, Reveal(0, 0))
+            command(casino.owningKey, Reveal(1, 1))
 
             tweak {
-                output(CommitContract.id, RevealedState(image, alice, id1))
+                output(CommitContract.id, RevealedState(image, casino, id1))
                 failsWith("The linear ids must match")
             }
 
-            output(CommitContract.id, RevealedState(image, alice, id2))
+            output(CommitContract.id, RevealedState(image, casino, id2))
             verifies()
         }
     }
 
     @Test
     fun `Reveal command needs correct image`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
         ledgerServices.transaction {
-            output(CommitContract.id, RevealedState(image, alice, id1))
-            command(alice.owningKey, Reveal(0, 0))
+            output(CommitContract.id, RevealedState(image, casino, id1))
+            command(casino.owningKey, Reveal(0, 0))
 
             tweak {
-                input(CommitContract.id, CommittedState(SecureHash.allOnesHash, alice, id1))
+                input(CommitContract.id, CommittedState(SecureHash.allOnesHash, casino, id1))
                 failsWith("The commit image must match")
             }
 
-            input(CommitContract.id, CommittedState(image.hash, alice, id1))
+            input(CommitContract.id, CommittedState(image.hash, casino, id1))
             verifies()
         }
     }
 
     @Test
     fun `Reveal command leaves creator unchanged`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
         ledgerServices.transaction {
-            output(CommitContract.id, RevealedState(image, alice, id1))
-            command(alice.owningKey, Reveal(0, 0))
+            output(CommitContract.id, RevealedState(image, casino, id1))
+            command(casino.owningKey, Reveal(0, 0))
 
             tweak {
-                input(CommitContract.id, CommittedState(image.hash, bob, id1))
+                input(CommitContract.id, CommittedState(image.hash, player, id1))
                 failsWith("The creator must be unchanged")
             }
 
-            input(CommitContract.id, CommittedState(image.hash, alice, id1))
+            input(CommitContract.id, CommittedState(image.hash, casino, id1))
             verifies()
         }
     }
 
     @Test
     fun `Reveal command can be signed by anyone`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         val id1 = UniqueIdentifier()
         ledgerServices.transaction {
-            input(CommitContract.id, CommittedState(image.hash, alice, id1))
-            output(CommitContract.id, RevealedState(image, alice, id1))
+            input(CommitContract.id, CommittedState(image.hash, casino, id1))
+            output(CommitContract.id, RevealedState(image, casino, id1))
 
             tweak {
-                command(bob.owningKey, Reveal(0, 0))
+                command(player.owningKey, Reveal(0, 0))
                 verifies()
             }
 
-            command(alice.owningKey, Reveal(0, 0))
+            command(casino.owningKey, Reveal(0, 0))
             verifies()
         }
     }
 
     @Test
     fun `Use command needs a Revealed state input`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         ledgerServices.transaction {
-            input(CommitContract.id, RevealedState(image, alice, UniqueIdentifier()))
+            input(CommitContract.id, RevealedState(image, casino, UniqueIdentifier()))
             input(DummyContract.PROGRAM_ID, DummyState())
 
             tweak {
-                command(alice.owningKey, Use(1))
+                command(casino.owningKey, Use(1))
                 failsWith("The input must be a RevealedState")
             }
 
-            command(alice.owningKey, Use( 0))
+            command(casino.owningKey, Use(0))
             verifies()
         }
     }
 
     @Test
     fun `Use command needs the creator to be a signer`() {
-        val image = CommitImage(0L, 1L)
+        val image = CommitImage.createRandom(random)
         ledgerServices.transaction {
-            input(CommitContract.id, RevealedState(image, alice, UniqueIdentifier()))
+            input(CommitContract.id, RevealedState(image, casino, UniqueIdentifier()))
 
             tweak {
-                command(bob.owningKey, Use(0))
+                command(player.owningKey, Use(0))
                 failsWith("The creator must sign")
             }
 
-            command(alice.owningKey, Use( 0))
+            command(casino.owningKey, Use(0))
             verifies()
         }
     }
