@@ -12,6 +12,6 @@ class InitiatePlayGame(private val accountName: String) : FlowLogic<GameResult>(
 
   @Suspendable
   override fun call(): GameResult {
-    return GameResult(null, intArrayOf(1, 3, 5), 42, 141)
+    return GameResult( intArrayOf(1, 3, 5), 42, 141)
   }
 }
