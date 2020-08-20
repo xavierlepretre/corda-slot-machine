@@ -102,6 +102,9 @@ object CommitFlows {
 
             })
 
+            // TODO make the casino move on to revealing so that it can protect itself from a player that does not
+            // launch a correct FinalityFlow.
+
             // All visible so we also get the other commit state.
             return subFlow(ReceiveFinalityFlow(playerSession, fullySignedTx.id, StatesToRecord.ALL_VISIBLE))
 
