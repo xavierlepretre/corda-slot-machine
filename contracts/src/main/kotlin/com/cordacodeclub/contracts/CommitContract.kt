@@ -19,6 +19,7 @@ class CommitContract : Contract {
         for (command in commands) {
             when (command.value) {
                 is Commands.Commit -> verifyCommit(tx, command.value as Commands.Commit, command.signers)
+                is Commands.Reveal -> verifyReveal(tx, command.value as Commands.Reveal, command.signers)
             }
         }
 
@@ -34,8 +35,25 @@ class CommitContract : Contract {
         }
     }
 
+    private fun verifyReveal(tx: LedgerTransaction, reveal: Commands.Reveal, signers: List<PublicKey>) {
+        requireThat {
+            "The input must be a CommittedState" using (tx.inputs[reveal.inputIndex].state.data is CommittedState)
+            val committedState = tx.inputs[reveal.inputIndex].state.data as CommittedState
+
+            "The output must be a RevealedState" using (tx.outputStates[reveal.outputIndex] is RevealedState)
+            val revealedState = tx.outputStates[reveal.outputIndex] as RevealedState
+
+            "The linear ids must match" using (committedState.linearId == revealedState.linearId)
+            "The commit image must match" using (committedState.hash == revealedState.image.hash)
+            "The creator must be unchanged" using (committedState.creator == revealedState.creator)
+
+            // No signatures required
+        }
+    }
+
     sealed class Commands : CommandData {
         class Commit(val outputIndex: Int) : Commands()
+        class Reveal(val inputIndex: Int, val outputIndex: Int) : Commands()
     }
 
 }
