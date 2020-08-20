@@ -4,6 +4,7 @@ import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.RevealedState
 import net.corda.core.contracts.CommandData
 import net.corda.core.contracts.Contract
+import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.requireThat
 import net.corda.core.transactions.LedgerTransaction
 import java.security.PublicKey
@@ -47,6 +48,10 @@ class CommitContract : Contract {
             "The linear ids must match" using (committedState.linearId == revealedState.linearId)
             "The commit image must match" using (committedState.hash == revealedState.image.hash)
             "The creator must be unchanged" using (committedState.creator == revealedState.creator)
+
+            "The reveal deadline must be satisfied" using
+                    (tx.timeWindow?.untilTime != null
+                            && tx.timeWindow?.untilTime!! <= committedState.revealDeadline )
 
             // No signatures required
         }
