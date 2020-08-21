@@ -132,7 +132,7 @@ class CommitContract : Contract {
                         } ?: false
                     })
 
-            "The creator must sign" using signers.contains(revealedState.creator.owningKey)
+            // No signatures required as the winnings are calculated programmatically.
         }
         return tx.inRef(use.inputIndex)
     }

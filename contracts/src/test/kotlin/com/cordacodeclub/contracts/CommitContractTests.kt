@@ -634,7 +634,7 @@ class CommitContractTests {
     }
 
     @Test
-    fun `Use command needs the creator to be a signer`() {
+    fun `Use command can be signed by anyone`() {
         val casinoImage = CommitImage.createRandom(random)
         val playerImage = CommitImage.createRandom(random)
         ledgerServices.ledger {
@@ -650,7 +650,7 @@ class CommitContractTests {
 
                 tweak {
                     command(casino.owningKey, Use(2))
-                    failsWith("The creator must sign")
+                    verifies()
                 }
 
                 command(player.owningKey, Use(2))
