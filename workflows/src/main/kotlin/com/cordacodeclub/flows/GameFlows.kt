@@ -14,8 +14,13 @@ import java.util.*
 
 object GameFlows {
 
-    val commitDuration =  Duration.ofMinutes(2)
-    val revealDuration = Duration.ofMinutes(2)
+    val commitDuration = Duration.ofMinutes(2)!!
+    val revealDuration = Duration.ofMinutes(2)!!
+
+    data class GameSetup(val player: AbstractParty,
+                         val casino: AbstractParty,
+                         val commitDeadline: Instant,
+                         val revealDeadline: Instant)
 
     /**
      * Initiated by the player.
@@ -30,16 +35,13 @@ object GameFlows {
         override fun call() {
 
             val playerImage = CommitImage.createRandom(Random())
-            val commitDeadline = Instant.now().plus(commitDuration)
-            val revealDeadline = commitDeadline.plus(revealDuration)
+            val commitDeadline = Instant.now().plus(commitDuration)!!
+            val revealDeadline = commitDeadline.plus(revealDuration)!!
             val casinoHost = serviceHub.identityService.requireWellKnownPartyFromAnonymous(casino)
             val casinoSession = initiateFlow(casinoHost)
 
             // Inform casino of new game
-            casinoSession.send(player)
-            casinoSession.send(casino)
-            casinoSession.send(commitDeadline)
-            casinoSession.send(revealDeadline)
+            casinoSession.send(GameSetup(player, casino, commitDeadline, revealDeadline))
 
             // Player asks casino for commit and prepares double commits
             val commitTx = subFlow(CommitFlows.Initiator(
@@ -70,12 +72,10 @@ object GameFlows {
             val casinoImage = CommitImage.createRandom(Random())
 
             // Receive new game information
-            val player = playerSession.receive<AbstractParty>().unwrap { it }
-            val casino = playerSession.receive<AbstractParty>().unwrap { it }
-            val commitDeadline = playerSession.receive<Instant>().unwrap { it }
+            val (player, casino, commitDeadline, revealDeadline) =
+                    playerSession.receive<GameSetup>().unwrap { it }
             if (Instant.now().plus(revealDuration) < commitDeadline.plus(Duration.ofMinutes(1)))
                 throw FlowException("Commit deadline is too far in the future")
-            val revealDeadline = playerSession.receive<Instant>().unwrap { it }
             if (commitDeadline.plus(revealDuration) != revealDeadline)
                 throw FlowException("Reveal deadline is incorrect")
 
