@@ -78,13 +78,8 @@ object CommitFlows {
                 override fun checkTransaction(stx: SignedTransaction) {
 
                     // Only 1 command with a local key, i.e. to sign by me.
-                    val myCommands = stx.tx.commands.filter { command ->
-                        command.signers.any { key ->
-                            // A key is local
-                            serviceHub.keyManagementService.filterMyKeys(listOf(key))
-                                    .toList()
-                                    .isNotEmpty()
-                        }
+                    val myCommands = stx.tx.commands.filter {
+                        it.signers.any(serviceHub::isLocalKey)
                     }
                     if (myCommands.size != 1)
                         throw FlowException("I should have only 1 command to sign")
