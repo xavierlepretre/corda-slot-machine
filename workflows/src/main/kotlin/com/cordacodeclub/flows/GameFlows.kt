@@ -57,10 +57,13 @@ object GameFlows {
             val casinoRevealTx = subFlow(RevealFlows.Responder(casinoSession))
             val casinoRevealed = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
 
-            TODO("Player creates outcome transaction")
+            // Player initiates resolution.
+            val useTx = subFlow(UseFlows.Initiator(
+                    playerRevealed, casinoRevealed, gameRef, casinoSession))
 
+            TODO("Return the outcome for the RPC")
         }
-        
+
     }
 
     @InitiatedBy(Initiator::class)
@@ -91,7 +94,8 @@ object GameFlows {
                     casinoCommit, casinoImage, revealDeadline, gameRef, listOf(casino, player), listOf(playerSession)))
             val casinoRevealed = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
 
-            TODO("Casino receives outcome transaction from player")
+            // Casino participates in resolution.
+            val useTx = subFlow(UseFlows.Responder(playerSession, casinoRevealed))
 
         }
 
