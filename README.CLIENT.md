@@ -69,11 +69,12 @@ or by using an IntelliJ run configuration.
 
 ## Source code
 
-The slot machine UI is third-party `slots_v2.0.0.zip` which contains:
+The slot machine UI is third-party `slots_v2.0.0.zip` from https://slotmachinescript.com/ which contains:
 
 - A `readme.html`
-- Web application server source code written in PHP
-- JavaScript (an in-browser front-end)
+- Web application server source code, written in PHP
+- JavaScript, implementing in-browser front-end logic and DOM manipulation --
+the "spin" action uses Ajax, so it's all a simple "single-page application", except perhaps for the login
 - Image files and CSS
 - SQL files
 
@@ -87,4 +88,57 @@ To integrate this we:
 
 The `readme.html` is [located here](./clients/readme.html) where it won't be seen by end-users.
 It contains interesting details about how to customise the game.
-I didn't archive the original `slots_v2.0.0.zip` in this repository.
+
+I didn't archive the original `slots_v2.0.0.zip` in this repository (ask Martin Jee for a copy of it if you want one).
+
+Unfortunately there's no obvious way to run PHP on Java.
+Solutions for combining PHP with Spring are unsupported (e.g. dated 2014):
+
+- https://stackoverflow.com/questions/7068681/mixing-spring-mvc-with-inline-php
+  suggests http://quercus.caucho.com/
+  for "Java implementing PHP"
+- https://stackoverflow.com/questions/19310519/any-spring-php-project
+  suggests https://code.google.com/archive/p/springphp/
+  for "Porting Spring to PHP"
+
+So there are two alternatives:
+
+- Keep (and deploy) the PHP implementation, and connect it to
+  our Corda RPC end-points using [LAB577's Braid](https://gitlab.com/bluebank/braid)
+- Reimplement using Java (e.g. Spring) to connect to Corda's RPC directly i.e. using a `CordaRPCConnection` instance
+
+I chose the latter:
+
+- Because after moving game logic into Corda, there's not much source code left in the web server
+  (so not too difficult to port)
+- Because an all-Java (or all-Kotlin) solution might be easier for other Corda developers to support,
+  (e.g. doesn't require deploying to a PHP environment/stack)
+
+Having chosen Spring there are then two ways to replace the PHP (which implements server-side rendering):
+
+- Choose some other server-side template engine for Spring --
+  [Comparing Template engines for Spring MVC](https://github.com/jreijn/spring-comparing-template-engines)
+  lists 20 of them, including JSP, Groovy, and Mustache
+  -- see also https://www.baeldung.com/spring-template-engines
+- Serve static HTML with client-side rendering --
+  this is what https://github.com/corda/samples-kotlin/tree/master/Basic/cordapp-example is doing,
+  using Angular as its JavaScript framework
+
+Again, I chose the latter, to minimise the required dependencies -- i.e. a template engine (syntax and implementation).
+Client-side rendering will be more maintainable fwiw, because every web developer is familiar with JavaScript.
+
+The pre-existing 3rd-party JavaScript (i.e. `js/slots.js`) depends on `jquery` and `jquery-ui` libraries
+(and not e.g. Angular or React).
+
+To avoid touching the 3rd-party `js/slots.js` I do the following:
+
+- Write a static HTML file (i.e. `slots/index.html`) to emulate the HTML embedded in the PHP
+- Write a JavaScript file (i.e. `js/setup.js`) to emulate the way in which the PHP would have customised the HTML --
+  this runs in the client's browser and edits the DOM before the 3rd-party `slots.js` is run
+
+  All scripts are included at the end of the HTML, so `setup.js` simply runs immediately
+instead of being triggered by the `$(window).on("load")` event.
+This requires an extra round-trip to the server (to get user ID and balance after the static HTML is loaded),
+though this whole solution is already unoptimized e.g. with multiple script files and image files to load.
+This will off-load the server a bit anyway
+(i.e. not running a templating engine on the server, the static HTML ought to be cacheable).
