@@ -175,7 +175,7 @@ class CommitContractTests {
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     Instant.now(), 0, playerId))
             command(casino.owningKey, Commit(1))
-            failsWith("All outputs states must have a command")
+            failsWith("All outputs states which belong to one party must have an associated command")
 
             command(player.owningKey, Commit(2))
             verifies()
@@ -446,7 +446,7 @@ class CommitContractTests {
                     output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                             Instant.now(), 2, playerId))
                     output(CommitContract.id, GameState(listOf(playerId), UniqueIdentifier(), listOf(player)))
-                    failsWith("All outputs states must have a command")
+                    failsWith("All outputs states which belong to one party must have an associated command")
 
                     command(player.owningKey, Commit(1))
                     verifies()
@@ -454,7 +454,7 @@ class CommitContractTests {
 
                 tweak {
                     input(playerRef.ref)
-                    failsWith("All inputs states must have a command")
+                    failsWith("All inputs states which belong to one party must have an associated command")
 
                     output(CommitContract.id, RevealedState(playerImage, player,
                             playerRef.getGamePointer(), playerRef.state.data.linearId))
@@ -465,7 +465,7 @@ class CommitContractTests {
                 tweak {
                     output(CommitContract.id, RevealedState(playerImage, player,
                             playerRef.getGamePointer(), playerRef.state.data.linearId))
-                    failsWith("All outputs states must have a command")
+                    failsWith("All outputs states which belong to one party must have an associated command")
 
                     input(playerRef.ref)
                     command(player.owningKey, Reveal(1, 1))
@@ -598,7 +598,7 @@ class CommitContractTests {
                     output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                             Instant.now(), 1, playerId))
                     output(CommitContract.id, GameState(listOf(playerId), UniqueIdentifier(), listOf(player)))
-                    failsWith("All outputs states must have a command")
+                    failsWith("All outputs states which belong to one party must have an associated command")
 
                     command(player.owningKey, Commit(0))
                     verifies()
@@ -606,7 +606,7 @@ class CommitContractTests {
 
                 tweak {
                     input(playerRef2.ref)
-                    failsWith("All inputs states must have a command")
+                    failsWith("All inputs states which belong to one party must have an associated command")
 
                     output(CommitContract.id, RevealedState(playerImage, player,
                             playerRef2.getGamePointer(), playerRef2.state.data.linearId))
@@ -619,7 +619,7 @@ class CommitContractTests {
                 tweak {
                     output(CommitContract.id, RevealedState(playerImage, player,
                             playerRef2.getGamePointer(), playerRef2.state.data.linearId))
-                    failsWith("All outputs states must have a command")
+                    failsWith("All outputs states which belong to one party must have an associated command")
 
                     input(playerRef2.ref)
                     command(player.owningKey, Reveal(3, 0))

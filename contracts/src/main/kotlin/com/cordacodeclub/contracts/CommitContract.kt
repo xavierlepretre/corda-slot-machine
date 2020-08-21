@@ -48,10 +48,10 @@ class CommitContract : Contract {
                 }
                 .toMultiMap()
         requireThat {
-            "All inputs states must have a command" using tx.inputs
+            "All inputs states which belong to one party must have an associated command" using tx.inputs
                     .filter { ref -> ref.state.data.let { it is CommittedState || it is RevealedState } }
                     .all { coveredStates[inputsKey]?.contains(it.ref) ?: false }
-            "All outputs states must have a command" using tx.outputs
+            "All outputs states which belong to one party must have an associated command" using tx.outputs
                     .mapIndexed { index, state -> index to state }
                     .filter { ref -> ref.second.data.let { it is CommittedState || it is RevealedState } }
                     .all { coveredStates[outputsKey]?.contains(StateRef(tx.id, it.first)) ?: false }
