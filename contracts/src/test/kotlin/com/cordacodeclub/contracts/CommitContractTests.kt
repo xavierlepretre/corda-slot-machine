@@ -623,8 +623,7 @@ class CommitContractTests {
 
                     input(playerRef2.ref)
                     command(player.owningKey, Reveal(3, 0))
-                    // Put the reference back when the tweak bug is fixed.
-//                    reference(playerRef2.getGamePointer().pointer)
+                    reference(playerRef2.getGamePointer().pointer)
                     timeWindow(TimeWindow.untilOnly(Instant.now()))
                     verifies()
                 }
