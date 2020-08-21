@@ -3,9 +3,8 @@ package com.cordacodeclub.flows
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract
 import com.cordacodeclub.contracts.CommitContract.Commands.Reveal
-import com.cordacodeclub.states.CommitImage
-import com.cordacodeclub.states.CommittedState
-import com.cordacodeclub.states.RevealedState
+import com.cordacodeclub.states.*
+import net.corda.core.contracts.ReferencedStateAndRef
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.TimeWindow
 import net.corda.core.flows.FinalityFlow
@@ -29,8 +28,18 @@ object RevealFlows {
             val committedRef: StateAndRef<CommittedState>,
             val image: CommitImage,
             val revealDeadline: Instant,
+            val gameRef: StateAndRef<GameState>,
             val otherParticipants: List<AbstractParty>,
             val otherSessions: Collection<FlowSession>) : FlowLogic<SignedTransaction>() {
+
+        init {
+            require(image.hash == committedRef.state.data.hash) {
+                "The image does not correspond to the committed ref"
+            }
+            require(committedRef.getGamePointer().pointer == gameRef.ref) {
+                "The game reference does not correspond to the committed ref"
+            }
+        }
 
         @Suspendable
         override fun call(): SignedTransaction {
@@ -38,9 +47,11 @@ object RevealFlows {
             val builder = TransactionBuilder(committedRef.state.notary)
                     .addInputState(committedRef)
                     .addOutputState(
-                            RevealedState(image, committed.creator, committed.linearId, otherParticipants),
+                            RevealedState(image, committed.creator, committedRef.getGamePointer(),
+                                    committed.linearId, otherParticipants),
                             CommitContract.id)
                     .addCommand(Reveal(0, 0))
+                    .addReferenceState(ReferencedStateAndRef(gameRef))
                     .setTimeWindow(TimeWindow.untilOnly(revealDeadline))
 
             builder.verify(serviceHub)

@@ -3,6 +3,7 @@ package com.cordacodeclub.flows
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.states.CommitImage
 import com.cordacodeclub.states.CommittedState
+import com.cordacodeclub.states.GameState
 import com.cordacodeclub.states.RevealedState
 import net.corda.core.flows.*
 import net.corda.core.identity.AbstractParty
@@ -44,11 +45,12 @@ object GameFlows {
             val commitTx = subFlow(CommitFlows.Initiator(
                     playerImage.hash, player, commitDeadline, revealDeadline, casinoSession, casino))
             val commitStates = commitTx.tx.outRefsOfType<CommittedState>()
+            val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
             val playerCommit = commitStates.single { it.state.data.creator == player }
 
             // Player reveals secretly.
             val playerRevealTx = subFlow(RevealFlows.Initiator(
-                    playerCommit, playerImage, revealDeadline, listOf(player), listOf()))
+                    playerCommit, playerImage, revealDeadline, gameRef, listOf(player), listOf()))
             val playerRevealed = playerRevealTx.tx.outRefsOfType<RevealedState>().single()
             val casinoRevealTx = subFlow(RevealFlows.Responder(casinoSession))
             val casinoRevealed = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
@@ -81,11 +83,12 @@ object GameFlows {
             val commitTx = subFlow(CommitFlows.Responder(
                     playerSession, commitDeadline, revealDeadline, casinoImage.hash, casino))
             val commitStates = commitTx.tx.outRefsOfType<CommittedState>()
+            val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
             val casinoCommit = commitStates.single { it.state.data.creator == casino }
 
             // Casino reveals and discloses.
             val casinoRevealTx = subFlow(RevealFlows.Initiator(
-                    casinoCommit, casinoImage, revealDeadline, listOf(casino, player), listOf(playerSession)))
+                    casinoCommit, casinoImage, revealDeadline, gameRef, listOf(casino, player), listOf(playerSession)))
             val casinoRevealed = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
 
             TODO("Casino receives outcome transaction from player")

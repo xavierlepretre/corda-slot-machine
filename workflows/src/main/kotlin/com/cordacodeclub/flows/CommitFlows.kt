@@ -3,6 +3,7 @@ package com.cordacodeclub.flows
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Commit
 import com.cordacodeclub.states.CommittedState
+import com.cordacodeclub.states.GameState
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.UniqueIdentifier
@@ -39,11 +40,15 @@ object CommitFlows {
 
             // First notary, not caring much...
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
+            val playerCommitId = UniqueIdentifier()
+            val casinoCommitId = UniqueIdentifier()
             val builder = TransactionBuilder(notary)
-                    .addOutputState(CommittedState(playerHash, player, revealDeadline,
-                            UniqueIdentifier(), listOf(player, casino)))
+                    .addOutputState(CommittedState(playerHash, player, revealDeadline, 2,
+                            playerCommitId, listOf(player, casino)))
                     .addCommand(Command(Commit(0), player.owningKey))
-                    .addOutputState(CommittedState(casinoHash, casino, revealDeadline,
+                    .addOutputState(CommittedState(casinoHash, casino, revealDeadline, 2,
+                            casinoCommitId, listOf(player, casino)))
+                    .addOutputState(GameState(listOf(playerCommitId, casinoCommitId),
                             UniqueIdentifier(), listOf(player, casino)))
                     .addCommand(Command(Commit(1), casino.owningKey))
                     .setTimeWindow(TimeWindow.untilOnly(commitDeadline))
