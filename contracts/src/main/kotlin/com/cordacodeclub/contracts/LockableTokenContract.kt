@@ -1,0 +1,121 @@
+package com.cordacodeclub.contracts
+
+import com.cordacodeclub.contracts.LockableTokenContract.Commands.*
+import com.cordacodeclub.states.LockableTokenState
+import com.cordacodeclub.states.LockableTokenType
+import net.corda.core.contracts.Amount
+import net.corda.core.contracts.CommandData
+import net.corda.core.contracts.Contract
+import net.corda.core.contracts.Requirements.using
+import net.corda.core.internal.toMultiMap
+import net.corda.core.transactions.LedgerTransaction
+
+class LockableTokenContract : Contract {
+
+    companion object {
+        val id = LockableTokenContract::class.java.canonicalName
+        val inputsKey = 1
+        val outputsKey = 2
+    }
+
+    override fun verify(tx: LedgerTransaction) {
+        val commands = tx.commandsOfType<Commands>()
+
+        val coveredLockableStates = commands.flatMap { command ->
+
+            // Common tests
+            val rawInputs = (command.value as? HasInputs)
+                    ?.inputIndices
+                    ?.map { tx.inputStates[it] }
+                    ?: listOf()
+            val rawOutputs = (command.value as? HasOutputs)
+                    ?.outputIndices
+                    ?.map { tx.outputStates[it] }
+                    ?: listOf()
+            "The inputs must be lockable token states" using rawInputs.all { it is LockableTokenState }
+            "The outputs must be lockable token states" using rawOutputs.all { it is LockableTokenState }
+            val inputs = rawInputs.filterIsInstance<LockableTokenState>()
+            val outputs = rawOutputs.filterIsInstance<LockableTokenState>()
+            // The inputs can have 0 values
+            "The outputs must have positive amounts" using outputs.all { 0 < it.amount.quantity }
+            val inputIssuers = inputs.map { it.issuer }.distinct()
+            val outputIssuers = outputs.map { it.issuer }.distinct()
+            val inputSum = inputs.map { it.amount }
+                    .takeIf { it.isNotEmpty() }
+                    ?.reduceRight { left, right -> left + right }
+                    ?: Amount.zero(LockableTokenType)
+            val outputSum = outputs.map { it.amount }
+                    .takeIf { it.isNotEmpty() }
+                    ?.reduceRight { left, right -> left + right }
+                    ?: Amount.zero(LockableTokenType)
+            val lockedInputSum = inputs.filter { it.isLocked }
+                    .map { it.amount }
+                    .takeIf { it.isNotEmpty() }
+                    ?.reduce { left, right -> left + right }
+                    ?: Amount.zero(LockableTokenType)
+            val lockedOutputSum = outputs.filter { it.isLocked }
+                    .map { it.amount }
+                    .takeIf { it.isNotEmpty() }
+                    ?.reduceRight { left, right -> left + right }
+                    ?: Amount.zero(LockableTokenType)
+
+            when (command.value) {
+                is Issue -> {
+                    // No check on inputs issuer.
+                    "The outputs must have a single issuer" using (outputIssuers.size == 1)
+                    // No check on same input and output issuers.
+                    // No check on lock status of inputs.
+                    "The outputs must be unlocked" using outputs.all { !it.isLocked }
+                    // No check on sums.
+                    // No check on locked sums.
+                    // No check on holder signatures.
+                    "The issuer must sign" using command.signers.contains(outputIssuers.single().owningKey)
+                }
+            }
+
+            val inputPairs = (command.value as? HasInputs)?.inputIndices
+                    ?.map { inputsKey to it }
+                    ?: listOf()
+            val outputPairs = (command.value as? HasOutputs)?.outputIndices
+                    ?.map { outputsKey to it }
+                    ?: listOf()
+
+            inputPairs.plus(outputPairs)
+        }.toMultiMap()
+
+        val coveredInputs = coveredLockableStates[inputsKey] ?: listOf()
+        val coveredOutputs = coveredLockableStates[outputsKey] ?: listOf()
+        "All covered token inputs must have no overlap" using (coveredInputs.distinct().size == coveredInputs.size)
+        "All covered token outputs must have no overlap" using (coveredOutputs.distinct().size == coveredOutputs.size)
+        val allLockableInputs = tx.inputStates
+                .mapIndexed { index, state -> index to state }
+                .filter { it.second is LockableTokenState }
+                .map { it.first }
+        "All lockable token inputs must be covered by a command" using (
+                coveredInputs.size == allLockableInputs.size
+                        && coveredInputs.containsAll(allLockableInputs))
+        val allLockableOutputs = tx.outputStates
+                .mapIndexed { index, state -> index to state }
+                .filter { it.second is LockableTokenState }
+                .map { it.first }
+        "All lockable token outputs must be covered by a command" using (
+                coveredOutputs.size == allLockableOutputs.size
+                        && coveredOutputs.containsAll(allLockableOutputs))
+    }
+
+    sealed class Commands : CommandData {
+        class Issue(override val outputIndices: List<Int>) : Commands(), HasOutputs {
+            init {
+                require(outputIndices.isNotEmpty()) { "Issue must have outputs" }
+            }
+        }
+    }
+
+    interface HasInputs {
+        val inputIndices: List<Int>
+    }
+
+    interface HasOutputs {
+        val outputIndices: List<Int>
+    }
+}
