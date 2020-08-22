@@ -95,6 +95,21 @@ class LockableTokenContract : Contract {
                             .containsAll(inputs.mapNotNull { it.holder?.owningKey })
                     // No check on issuer signatures.
                 }
+                is Redeem -> {
+                    "The inputs must have a single issuer" using (inputIssuers.size == 1)
+                    "The outputs must have at most one issuer" using (outputIssuers.size <= 1)
+                    "The input and output issuers must be the same" using (outputIssuers.isEmpty()
+                            || inputIssuers.single() == outputIssuers.single())
+                    "The inputs must be unlocked" using inputs.all { !it.isLocked }
+                    "The outputs must be unlocked" using outputs.all { !it.isLocked }
+                    "The sums must decrease or be zero" using (inputSum == Amount.zero(LockableTokenType)
+                            || outputSum < inputSum)
+                    // No check on locked sums.
+                    "The input holders must sign" using command.signers
+                            .containsAll(inputs.mapNotNull { it.holder?.owningKey })
+                    "The input issuer must sign" using command.signers
+                            .contains(inputIssuers.single().owningKey)
+                }
             }
 
             val inputPairs = (command.value as? HasInputs)?.inputIndices
@@ -147,6 +162,14 @@ class LockableTokenContract : Contract {
             init {
                 require(inputIndices.isNotEmpty()) { "Release must have inputs" }
                 require(outputIndices.isNotEmpty()) { "Release must have outputs" }
+            }
+        }
+
+        class Redeem(override val inputIndices: List<Int>,
+                     override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
+            init {
+                require(inputIndices.isNotEmpty()) { "Redeem must have inputs" }
+                // There may be no outputs.
             }
         }
     }
