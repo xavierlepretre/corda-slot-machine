@@ -103,8 +103,8 @@ object GameFlows {
                     revealDeadline, gameRef, listOf(casino, player), listOf(playerSession)))
             val casinoRevealedRef = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
 
-            // Casino participates in resolution.
-            val useTx = subFlow(UseFlows.Responder(playerSession, casinoRevealedRef))
+            // Casino receives resolution.
+            val useTx = subFlow(UseFlows.Responder(playerSession))
         }
     }
 }

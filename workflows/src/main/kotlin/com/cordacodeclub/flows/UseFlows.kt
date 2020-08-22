@@ -38,52 +38,18 @@ object UseFlows {
                     .addCommand(Use(0), player.owningKey)
                     .addCommand(Use(1), player.owningKey)
             builder.verify(serviceHub)
-            val partiallySignedTx = serviceHub.signInitialTransaction(
-                    builder, player.owningKey)
-            val fullySignedTx = subFlow(CollectSignaturesFlow(
-                    partiallySignedTx, listOf(casinoSession), listOf(player.owningKey)))
-            return subFlow(FinalityFlow(fullySignedTx, casinoSession))
+            val signedTx = serviceHub.signInitialTransaction(builder, player.owningKey)
+            return subFlow(FinalityFlow(signedTx, casinoSession))
         }
     }
 
     /**
-     * In-lined flow initiated by the casino.
+     * In-lined flow initiated by the casino. Casino signatures are not required on resolution.
      * Its initiator is [Initiator].
      */
-    class Responder(
-            val playerSession: FlowSession,
-            val casinoRef: StateAndRef<RevealedState>) : FlowLogic<SignedTransaction>() {
+    class Responder(val playerSession: FlowSession) : FlowLogic<SignedTransaction>() {
 
         @Suspendable
-        override fun call(): SignedTransaction {
-
-            val fullySignedTx = subFlow(object : SignTransactionFlow(playerSession) {
-
-                override fun checkTransaction(stx: SignedTransaction) {
-
-                    // Only 1 command with a local key, i.e. to sign by me.
-                    val myCommands = stx.tx.commands.filter {
-                        it.signers.any(serviceHub::isLocalKey)
-                    }
-                    if (myCommands.size != 1)
-                        throw FlowException("I should have only 1 command to sign")
-                    val myCommand = myCommands.single().value
-                    if (myCommand !is CommitContract.Commands.Use)
-                        throw FlowException("I should only sign a Use command")
-                    val myRevealedState = stx.inputs[myCommand.inputIndex]
-                    if (myRevealedState != casinoRef.ref)
-                        throw FlowException("It is not my revealed ref")
-
-                }
-
-            })
-
-            // TODO make the casino move on to revealing so that it can protect itself from a player that does not
-            // launch a correct FinalityFlow.
-
-            // All visible so we also get the other commit state.
-            return subFlow(ReceiveFinalityFlow(playerSession, fullySignedTx.id, StatesToRecord.ALL_VISIBLE))
-
-        }
+        override fun call() = subFlow(ReceiveFinalityFlow(playerSession))
     }
 }
