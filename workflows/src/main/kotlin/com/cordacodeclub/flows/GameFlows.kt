@@ -7,20 +7,32 @@ import com.cordacodeclub.states.GameState
 import com.cordacodeclub.states.RevealedState
 import net.corda.core.flows.*
 import net.corda.core.identity.AbstractParty
+import net.corda.core.serialization.CordaSerializable
 import net.corda.core.utilities.unwrap
 import java.time.Duration
 import java.time.Instant
 import java.util.*
 
+/**
+ * Flows to orchestrate the game from start to finish.
+ */
 object GameFlows {
 
     val commitDuration = Duration.ofMinutes(2)!!
     val revealDuration = Duration.ofMinutes(2)!!
 
+    /**
+     * Data transport class to inform the remote note in 1 send.
+     */
+    @CordaSerializable
     data class GameSetup(val player: AbstractParty,
                          val casino: AbstractParty,
                          val commitDeadline: Instant,
-                         val revealDeadline: Instant)
+                         val revealDeadline: Instant) {
+        init {
+            require(commitDeadline < revealDeadline) { "The commit deadline must come before the reveal one" }
+        }
+    }
 
     /**
      * Initiated by the player.
@@ -28,42 +40,42 @@ object GameFlows {
      */
     @InitiatingFlow
     @StartableByRPC
-    class Initiator(val player: AbstractParty,
-                    val casino: AbstractParty) : FlowLogic<Unit>() {
+    class Initiator(val player: AbstractParty, val casino: AbstractParty) : FlowLogic<Unit>() {
 
         @Suspendable
         override fun call() {
-
             val playerImage = CommitImage.createRandom(Random())
             val commitDeadline = Instant.now().plus(commitDuration)!!
             val revealDeadline = commitDeadline.plus(revealDuration)!!
-            val casinoHost = serviceHub.identityService.requireWellKnownPartyFromAnonymous(casino)
+            val casinoHost = serviceHub.identityService.wellKnownPartyFromAnonymous(casino)
+                    ?: throw FlowException("Cannot resolve the casino host")
+            if (casinoHost == ourIdentity) throw FlowException("You must play with a remote host, not yourself")
             val casinoSession = initiateFlow(casinoHost)
-
             // Inform casino of new game
             casinoSession.send(GameSetup(player, casino, commitDeadline, revealDeadline))
-
+            // First notary, not caring much...
+            val notary = serviceHub.networkMapCache.notaryIdentities[0]
             // Player asks casino for commit and prepares double commits
             val commitTx = subFlow(CommitFlows.Initiator(
-                    playerImage.hash, player, commitDeadline, revealDeadline, casinoSession, casino))
-            val commitStates = commitTx.tx.outRefsOfType<CommittedState>()
+                    notary, playerImage.hash, player, commitDeadline, revealDeadline, casinoSession, casino))
             val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
-            val playerCommit = commitStates.single { it.state.data.creator == player }
+            val playerCommitRef = commitTx.tx.outRefsOfType<CommittedState>()
+                    .single { it.state.data.creator == player }
 
             // Player reveals secretly.
             val playerRevealTx = subFlow(RevealFlows.Initiator(
-                    playerCommit, playerImage, revealDeadline, gameRef, listOf(player), listOf()))
-            val playerRevealed = playerRevealTx.tx.outRefsOfType<RevealedState>().single()
+                    playerCommitRef, playerImage, revealDeadline, gameRef, listOf(player), listOf()))
+            val playerRevealedRef = playerRevealTx.tx.outRefsOfType<RevealedState>().single()
+            // Player responds to casino's reveal.
             val casinoRevealTx = subFlow(RevealFlows.Responder(casinoSession))
             val casinoRevealed = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
 
             // Player initiates resolution.
             val useTx = subFlow(UseFlows.Initiator(
-                    playerRevealed, casinoRevealed, gameRef, casinoSession))
+                    playerRevealedRef, casinoRevealed, gameRef, casinoSession))
 
             TODO("Return the outcome for the RPC")
         }
-
     }
 
     @InitiatedBy(Initiator::class)
@@ -71,9 +83,7 @@ object GameFlows {
 
         @Suspendable
         override fun call() {
-
             val casinoImage = CommitImage.createRandom(Random())
-
             // Receive new game information
             val (player, casino, commitDeadline, revealDeadline) =
                     playerSession.receive<GameSetup>().unwrap { it }
@@ -81,24 +91,20 @@ object GameFlows {
                 throw FlowException("Commit deadline is too far in the future")
             if (commitDeadline.plus(revealDuration) != revealDeadline)
                 throw FlowException("Reveal deadline is incorrect")
-
             // Casino gives commit info and gets both commits tx.
             val commitTx = subFlow(CommitFlows.Responder(
                     playerSession, commitDeadline, revealDeadline, casinoImage.hash, casino))
-            val commitStates = commitTx.tx.outRefsOfType<CommittedState>()
             val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
-            val casinoCommit = commitStates.single { it.state.data.creator == casino }
+            val casinoCommitRef = commitTx.tx.outRefsOfType<CommittedState>()
+                    .single { it.state.data.creator == casino }
 
-            // Casino reveals and discloses.
-            val casinoRevealTx = subFlow(RevealFlows.Initiator(
-                    casinoCommit, casinoImage, revealDeadline, gameRef, listOf(casino, player), listOf(playerSession)))
-            val casinoRevealed = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
+            // Casino does not receive any reveal from player, yet reveals and discloses.
+            val casinoRevealTx = subFlow(RevealFlows.Initiator(casinoCommitRef, casinoImage,
+                    revealDeadline, gameRef, listOf(casino, player), listOf(playerSession)))
+            val casinoRevealedRef = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
 
             // Casino participates in resolution.
-            val useTx = subFlow(UseFlows.Responder(playerSession, casinoRevealed))
-
+            val useTx = subFlow(UseFlows.Responder(playerSession, casinoRevealedRef))
         }
-
     }
-
 }
