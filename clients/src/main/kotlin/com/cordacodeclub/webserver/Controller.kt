@@ -19,56 +19,56 @@ import javax.servlet.http.HttpServletRequest
 @RequestMapping("/") // The paths for HTTP requests are relative to this base path.
 class Controller(rpc: NodeRPCConnection) {
 
-  companion object {
-    private val logger = LoggerFactory.getLogger(RestController::class.java)
-  }
-
-  private val proxy = rpc.proxy
-
-  @GetMapping(value = ["/test"], produces = ["text/plain"])
-  private fun test(): String {
-    return "Test OK"
-  }
-
-  @PostMapping(value = ["/echo"], produces = ["text/plain"])
-  private fun echo(request: HttpServletRequest): ResponseEntity<String> {
-    val payload = request.getParameter("payload")
-    return ResponseEntity.ok("Echo $payload")
-  }
-
-  @PostMapping(value = ["/create"], produces = ["text/plain"])
-  private fun create(request: HttpServletRequest): ResponseEntity<String> {
-    val name = request.getParameter("name")
-    try {
-      val result = proxy.startFlow(::CreateUserAccount, name).returnValue.getOrThrow()
-      return ResponseEntity.ok("Created $result")
-    } catch (e: Exception) {
-      val error = e.toString()
-      return ResponseEntity.ok("Failed $error")
+    companion object {
+        private val logger = LoggerFactory.getLogger(RestController::class.java)
     }
-  }
 
-  @PostMapping(value = ["/spin"], produces = ["text/plain"])
-  private fun spin(request: HttpServletRequest): ResponseEntity<String> {
-    val name = request.getParameter("name")
-    try {
-      val result = proxy.startFlow(::InitiatePlayGame, name).returnValue.getOrThrow()
-      return ResponseEntity.ok("Created ${result.payout_credits}")
-    } catch (e: Exception) {
-      val error = e.toString()
-      return ResponseEntity.ok("Failed $error")
-    }
-  }
+    private val proxy = rpc.proxy
 
-  @PostMapping(value = ["/spin2"], produces = ["application/json"])
-  private fun spin2(request: HttpServletRequest): ResponseEntity<SpinResult> {
-    val name = request.getParameter("name")
-    try {
-      val result = proxy.startFlow(::InitiatePlayGame, name).returnValue.getOrThrow()
-      return ResponseEntity.ok(SpinResult(result))
-    } catch (e: Exception) {
-      val error = e.toString()
-      return ResponseEntity.ok(SpinResult("Failed $error"))
+    @GetMapping(value = ["/test"], produces = ["text/plain"])
+    private fun test(): String {
+        return "Test OK"
     }
-  }
+
+    @PostMapping(value = ["/echo"], produces = ["text/plain"])
+    private fun echo(request: HttpServletRequest): ResponseEntity<String> {
+        val payload = request.getParameter("payload")
+        return ResponseEntity.ok("Echo $payload")
+    }
+
+    @PostMapping(value = ["/create"], produces = ["text/plain"])
+    private fun create(request: HttpServletRequest): ResponseEntity<String> {
+        val name = request.getParameter("name")
+        try {
+            val result = proxy.startFlow(::CreateUserAccount, name).returnValue.getOrThrow()
+            return ResponseEntity.ok("Created $result")
+        } catch (e: Exception) {
+            val error = e.toString()
+            return ResponseEntity.ok("Failed $error")
+        }
+    }
+
+    @PostMapping(value = ["/spin"], produces = ["text/plain"])
+    private fun spin(request: HttpServletRequest): ResponseEntity<String> {
+        val name = request.getParameter("name")
+        try {
+            val result = proxy.startFlow(::InitiatePlayGame, name).returnValue.getOrThrow()
+            return ResponseEntity.ok("Created ${result.payout_credits}")
+        } catch (e: Exception) {
+            val error = e.toString()
+            return ResponseEntity.ok("Failed $error")
+        }
+    }
+
+    @PostMapping(value = ["/spin2"], produces = ["application/json"])
+    private fun spin2(request: HttpServletRequest): ResponseEntity<SpinResult> {
+        val name = request.getParameter("name")
+        try {
+            val result = proxy.startFlow(::InitiatePlayGame, name).returnValue.getOrThrow()
+            return ResponseEntity.ok(SpinResult(result))
+        } catch (e: Exception) {
+            val error = e.toString()
+            return ResponseEntity.ok(SpinResult("Failed $error"))
+        }
+    }
 }

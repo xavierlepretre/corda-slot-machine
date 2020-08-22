@@ -11,19 +11,19 @@ import net.corda.core.flows.StartableByRPC
 @StartableByRPC
 class CreateUserAccount(private val accountName: String) : FlowLogic<String>() {
 
-  @Suspendable
-  override fun call(): String {
+    @Suspendable
+    override fun call(): String {
 
-    if (accountService.accountInfo(accountName).any() { it.state.data.host == ourIdentity }) {
-      return "$accountName account already exists"
-    }
+        if (accountService.accountInfo(accountName).any() { it.state.data.host == ourIdentity }) {
+            return "$accountName account already exists"
+        }
 
-    //Call inbuilt CreateAccount flow to create the AccountInfo object
-    return try {
-      val account = subFlow(CreateAccount(accountName))
-      "$accountName account has been created"
-    } catch (error: Exception) {
-      "Exception: $error"
+        //Call inbuilt CreateAccount flow to create the AccountInfo object
+        return try {
+            val account = subFlow(CreateAccount(accountName))
+            "$accountName account has been created"
+        } catch (error: Exception) {
+            "Exception: $error"
+        }
     }
-  }
 }
