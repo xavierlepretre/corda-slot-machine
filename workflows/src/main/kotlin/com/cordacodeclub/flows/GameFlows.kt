@@ -5,8 +5,12 @@ import com.cordacodeclub.states.CommitImage
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.GameState
 import com.cordacodeclub.states.RevealedState
+import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
+import com.r3.corda.lib.accounts.workflows.services.AccountService
 import net.corda.core.flows.*
 import net.corda.core.identity.AbstractParty
+import net.corda.core.identity.AnonymousParty
+import net.corda.core.identity.CordaX500Name
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.utilities.unwrap
 import java.time.Duration
@@ -31,6 +35,36 @@ object GameFlows {
                          val revealDeadline: Instant) {
         init {
             require(commitDeadline < revealDeadline) { "The commit deadline must come before the reveal one" }
+        }
+    }
+
+    @StartableByRPC
+    class SimpleInitiator(val playerName: String, val casinoName: CordaX500Name) : FlowLogic<Unit>() {
+
+        @Suspendable
+        override fun call() {
+            val casino = serviceHub.identityService.wellKnownPartyFromX500Name(casinoName)
+                    ?: throw FlowException("Unknown casino name $casinoName")
+            val accountService = serviceHub.cordaService(AccountService::class.java)
+            val playerAccount = accountService
+                    .accountInfo(playerName)
+                    .let {
+                        if (it.size == 0)
+                            throw FlowException("No player with this name $playerName")
+                        else if (1 < it.size)
+                            throw FlowException("More than 1 player found with this name $playerName")
+                        it.single()
+                    }
+                    .state.data
+            if (playerAccount.host != ourIdentity)
+                throw FlowException("This player is not hosted here $playerName")
+            val player = serviceHub.identityService.publicKeysForExternalId(playerAccount.identifier.id)
+                    .toList()
+                    .let {
+                        if (1 <= it.size) AnonymousParty(it.first())
+                        else serviceHub.createKeyForAccount(playerAccount)
+                    }
+            subFlow(Initiator(player, casino))
         }
     }
 
