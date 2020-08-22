@@ -71,6 +71,18 @@ class LockableTokenContract : Contract {
                     // No check on holder signatures.
                     "The issuer must sign" using command.signers.contains(outputIssuers.single().owningKey)
                 }
+                is Lock -> {
+                    "The inputs must have a single issuer" using (inputIssuers.size == 1)
+                    "The outputs must have a single issuer" using (outputIssuers.size == 1)
+                    "The input and output issuers must be the same" using (inputIssuers.single() == outputIssuers.single())
+                    "There must be unlocked inputs" using inputs.any { !it.isLocked }
+                    "There must be locked outputs" using outputs.any { it.isLocked }
+                    "The sums must be unchanged" using (inputSum == outputSum)
+                    "The locked sums must increase" using (lockedInputSum < lockedOutputSum)
+                    "The unlocked input holders must sign" using command.signers
+                            .containsAll(inputs.mapNotNull { it.holder?.owningKey })
+                    // No check on issuer signatures.
+                }
             }
 
             val inputPairs = (command.value as? HasInputs)?.inputIndices
@@ -107,6 +119,14 @@ class LockableTokenContract : Contract {
         class Issue(override val outputIndices: List<Int>) : Commands(), HasOutputs {
             init {
                 require(outputIndices.isNotEmpty()) { "Issue must have outputs" }
+            }
+        }
+
+        class Lock(override val inputIndices: List<Int>,
+                   override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
+            init {
+                require(inputIndices.isNotEmpty()) { "Lock must have inputs" }
+                require(outputIndices.isNotEmpty()) { "Lock must have outputs" }
             }
         }
     }
