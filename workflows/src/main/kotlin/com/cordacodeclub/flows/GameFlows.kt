@@ -52,12 +52,12 @@ object GameFlows {
             if (casinoHost == ourIdentity) throw FlowException("You must play with a remote host, not yourself")
             val casinoSession = initiateFlow(casinoHost)
             // Inform casino of new game
-            casinoSession.send(GameSetup(player, casino, commitDeadline, revealDeadline))
+            val setup = GameSetup(player, casino, commitDeadline, revealDeadline)
+            casinoSession.send(setup)
             // First notary, not caring much...
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
             // Player asks casino for commit and prepares double commits
-            val commitTx = subFlow(CommitFlows.Initiator(
-                    notary, playerImage.hash, player, commitDeadline, revealDeadline, casinoSession, casino))
+            val commitTx = subFlow(CommitFlows.Initiator(notary, playerImage.hash, setup, casinoSession))
             val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
             val playerCommitRef = commitTx.tx.outRefsOfType<CommittedState>()
                     .single { it.state.data.creator == player }

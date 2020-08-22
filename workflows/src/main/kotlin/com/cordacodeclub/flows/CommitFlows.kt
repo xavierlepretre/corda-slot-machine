@@ -30,14 +30,12 @@ object CommitFlows {
     class Initiator(
             val notary: Party,
             val playerHash: SecureHash,
-            val player: AbstractParty,
-            val commitDeadline: Instant,
-            val revealDeadline: Instant,
-            val casinoSession: FlowSession,
-            val casino: AbstractParty) : FlowLogic<SignedTransaction>() {
+            val setup: GameFlows.GameSetup,
+            val casinoSession: FlowSession) : FlowLogic<SignedTransaction>() {
 
         @Suspendable
         override fun call(): SignedTransaction {
+            val (player, casino, commitDeadline, revealDeadline) = setup
             if (casinoSession.counterparty != serviceHub.identityService.wellKnownPartyFromAnonymous(casino)
                     ?: throw FlowException("Cannot resolve the casino host"))
                 throw FlowException("The casinoSession is not for the casino")
