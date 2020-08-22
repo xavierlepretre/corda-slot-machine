@@ -142,3 +142,15 @@ This requires an extra round-trip to the server (to get user ID and balance afte
 though this whole solution is already unoptimized e.g. with multiple script files and image files to load.
 This will off-load the server a bit anyway
 (i.e. not running a templating engine on the server, the static HTML ought to be cacheable).
+
+## Testing
+
+There are no automated tests (i.e. regression tests).
+
+You can run end-to-end manually as described above (see [How to start it](how-to-start-it)).
+
+There's also a test page -- see
+[index.html](clients/src/main/resources/static/index.html) and
+[app.js](clients/src/main/resources/static/app.js) --
+which you can use to invoke and visually inspect the results of calls to the web server,
+without using the 3rd-party slot-machine front end.

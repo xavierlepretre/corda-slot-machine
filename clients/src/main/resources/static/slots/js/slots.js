@@ -25,8 +25,6 @@ var SlotMachines = {
 		bounceTime: 1000,
 
 		winningsFormatPrefix: '',  // If winnings are "money", set prefix to be '$', '£', etc. If everything is unit-less, leave as is.
-
-		actionURL: 'slots_action.php', // point to the server component to call to get spin results.
 	}
 }
 
@@ -209,12 +207,17 @@ SlotMachine.prototype.spin = function() {
 
 	var fnAJAXRequestSuccess = function(data){
 		spinResult = data;
+		try {
+			spinResult = window.ioServer.getResultReels(spinResult);
+		} catch (err) {
+			this.handleServerError({})
+		}
 		if (firstReelTimeoutHit == true) { _this.stopReelsAndEndSpin(spinResult); } // First reel should have stopped already, we are late
 	}
-	this.makeRequest(
-		{ action: 'spin', bet : this.curBet, window_id: window.windowID, game_type: this.gameType},
-		fnAJAXRequestSuccess
-	);
+	// cwellsx: params were previously { action: 'spin', bet : this.curBet, window_id: window.windowID, game_type: this.gameType}
+	const params = window.ioServer.getPostParameters()
+	const url = window.ioServer.getUrl()
+	this.makeRequest(params, url, fnAJAXRequestSuccess);
 };
 
 // Called once the first reel needs to stop (first reel timeout has hit *and* we got our
@@ -270,11 +273,11 @@ SlotMachine.prototype.abortSpinAbruptly = function() {
 	SlotsSounds.stopSound("spinning");
 };
 
-SlotMachine.prototype.makeRequest = function(params, fnSuccess) {
+SlotMachine.prototype.makeRequest = function(params, url, fnSuccess) {
 	var _this = this;
 
 	$.ajax({
-		url: SlotMachines.config.actionURL,
+		url: url,
 		type: "POST",
 		data: params,
 		dataType: "json",
@@ -285,7 +288,7 @@ SlotMachine.prototype.makeRequest = function(params, fnSuccess) {
 			}
 			fnSuccess(data);
 		},
-		error: function() {
+		error: function(jqXHR, textStatus, errorThrown) {
 			return _this.handleServerError({});
 		}
 	});

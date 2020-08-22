@@ -82,11 +82,10 @@
     });
   }
   const prizes = listPrizesForRendering(gameType);
+  // this displays winning reels by adding to a template defined in the HTML
   const $elPrizesList = $elSlotsOuterContainer.find(".slot_machine_prizes_list");
   const htmlTemplatePrizes = $("#template_prizes").html();
-  //const elTemplatePrizes = document.querySelector('#template_prizes').content;
   prizes.forEach((prize) => {
-    //const $el0 = $elTemplatePrizes.clone();
     const $el = $(htmlTemplatePrizes);
     $el.find(".slot_machine_prize_row").addClass("slot_machine_prize_row_" + prize.id);
     $el.find(".slot_machine_prize_reel1").addClass(prize.reel1_classname);
@@ -95,4 +94,56 @@
     $el.find(".slot_machine_prize_payout").attr("data-basePayout", prize.payout_winnings).text(prize.payout_winnings);
     $elPrizesList.append($el);
   });
+  // this is custom code to define our non-standard interface with the web server
+  function ioServer() {
+    // this emulates PrizesAndReels::ReelsForPrizeID
+    // which the PHP would call from RandomLogic::PrizeAndReels after selecting a prize
+    function getReelsForPayout(payout) {
+      function getParsedRules(payout) {
+        if (payout === "0") return { reel1: "*", reel2: "*", reel3: "*" };
+        const prize = prizes.find((it) => it.payout_winnings == payout);
+        if (!prize) throw `Unsupported prize '${payout}'`;
+        return { reel1: prize.reel1_parsed, reel2: prize.reel2_parsed, reel3: prize.reel3_parsed };
+      }
+      function forcedReelOutcome(rule) {
+        if (rule === "*") rule = ["1", "2", "3", "4", "5", "6"];
+        if (!Array.isArray(rule)) return rule;
+        return rule[Math.floor(Math.random() * rule.length)];
+      }
+      function payoutForReels(reels) {
+        function compareReel(outcome, rule) {
+          return Array.isArray(rule) ? rule.find((option) => option === outcome) : rule === outcome;
+        }
+        const found = prizes.find(
+          (prize) =>
+            compareReel(reels[0], prize.reel1_parsed) &&
+            compareReel(reels[1], prize.reel2_parsed) &&
+            compareReel(reels[2], prize.reel3_parsed)
+        );
+        return found ? found.payout_credits : 0;
+      }
+      const parsedRules = getParsedRules(payout);
+      for (let i = 0; i < 1000; ++i) {
+        const reels = [
+          forcedReelOutcome(parsedRules.reel1),
+          forcedReelOutcome(parsedRules.reel2),
+          forcedReelOutcome(parsedRules.reel3),
+        ];
+        if (payoutForReels(reels) == payout) return reels;
+      }
+      throw `Failed to find reels for '${payout}'`;
+    }
+    function getResultReels(result) {
+      result.reels = getReelsForPayout(result.prize?result.prize.payout_credits:0);
+      return result;
+    }
+    function getPostParameters() {
+      return { name: "anyname" };
+    }
+    function getUrl() {
+      return "/spin2";
+    }
+    return { getResultReels, getPostParameters, getUrl };
+  }
+  window.ioServer = ioServer();
 })();
