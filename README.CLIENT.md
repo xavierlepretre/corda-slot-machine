@@ -154,3 +154,19 @@ There's also a test page -- see
 [app.js](clients/src/main/resources/static/app.js) --
 which you can use to invoke and visually inspect the results of calls to the web server,
 without using the 3rd-party slot-machine front end.
+
+## Login
+
+We need an account for each end-user.
+Storing a persistent user-name is a nuisance per the GDPR.
+
+I propose the following as a solution which I hope avoids the need for us to implement storing and managing the user's consent:
+
+- When the app loads, it checks for presence of a cookie.
+- If the cookie is present then the account name is extracted from the cookie and the user can play.
+- If no cookie is present then an account must be created.
+The account always has a random name.
+If the user selects "Remember me" then the generated random name is also stored as a cookie.
+I'm not a lawyer but perhaps this counts is as an essential session cookie,
+instead of as a preference cookie for which we need consent.
+- The user can clear the cookie at any time.

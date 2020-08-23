@@ -47,7 +47,8 @@ a img { border: none; }
 }
 
 .slot_machine_container .slot_machine_logged_out_message,
-.slot_machine_container .slot_machine_failed_request_message {
+.slot_machine_container .slot_machine_failed_request_message,
+#loginDialog .error {
 	position: absolute;
 	top: 104px; left: 42px; width: 355px;
 	z-index: 1000;

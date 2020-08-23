@@ -1,72 +1,104 @@
 <head>
     <title>Slots</title>
-    <link type="text/css" rel="stylesheet" href="css/slots.css"/>
-    <link type="text/css" rel="stylesheet" href="css/template2.css"/>
-    <meta name="viewport" content="width=880px, user-scalable=no, target-densitydpi=device-dpi"/>
+    <link type="text/css" rel="stylesheet" href="css/slots.css" />
+    <link type="text/css" rel="stylesheet" href="css/template2.css" />
+    <link type="text/css" rel="stylesheet" href="css/jquery-ui.1.8.17.min.css" />
+    <meta name="viewport" content="width=880, user-scalable=no, target-densitydpi=device-dpi" />
 </head>
 
 <body>
-<template id="template_prizes">
-    <div class="slot_machine_prize_row">
-        <div class="slot_machine_prize_reel_sprites">
-            <div class="slot_machine_prize_reel1 slot_machine_prize_reel_icon"></div>
-            <div class="slot_machine_prize_reel2 slot_machine_prize_reel_icon"></div>
-            <div class="slot_machine_prize_reel3 slot_machine_prize_reel_icon"></div>
+    <template id="template_prizes">
+        <div class="slot_machine_prize_row">
+            <div class="slot_machine_prize_reel_sprites">
+                <div class="slot_machine_prize_reel1 slot_machine_prize_reel_icon"></div>
+                <div class="slot_machine_prize_reel2 slot_machine_prize_reel_icon"></div>
+                <div class="slot_machine_prize_reel3 slot_machine_prize_reel_icon"></div>
+                <div class="clearer"></div>
+            </div>
+            <span class="slot_machine_prize_payout"></span>
             <div class="clearer"></div>
         </div>
-        <span class="slot_machine_prize_payout"></span>
-        <div class="clearer"></div>
-    </div>
-</template>
+    </template>
 
-<div class="slot_machine_outer_container">
-    <div class="slot_machine_win_bg">
-        <div class="slot_machine_prizes_list">
+    <div class="slot_machine_outer_container">
+        <div class="slot_machine_win_bg">
+            <div class="slot_machine_prizes_list">
+            </div>
+
+            <div class="slot_machine_container">
+
+                <div class="slot_machine_reel_container">
+                    <div class="slot_machine_reel slot_machine_reel1"></div>
+                    <div class="slot_machine_reel slot_machine_reel2"></div>
+                    <div class="slot_machine_reel slot_machine_reel3"></div>
+                    <div class="reel_overlay"></div>
+                </div>
+
+                <div class="slot_machine_failed_request_message" style="display: none;"><span class="large">Sorry, we're
+                        unable to display your spin because your connection to our server was lost. </span><br />
+                    Rest assured that your spin was not wasted.
+                    Please check your connection and <a href="#" onclick="window.location.reload();">refresh</a> to try
+                    again.
+                </div>
+
+                <div class="slot_machine_controls">
+                    <span class="slot_machine_output_last_win"></span>
+                    <span class="slot_machine_output_balance"></span>
+                    <span class="slot_machine_output_day_winnings">0</span>
+                    <span class="slot_machine_output_lifetime_winnings"></span>
+                    <span class="slot_machine_output_bet"></span>
+                    <div class="slot_machine_bet_increase_button"></div>
+                    <div class="slot_machine_bet_decrease_button"></div>
+                </div>
+
+                <div class="slot_machine_spin_button"></div>
+            </div>
+
+            <div class="slot_machine_sound_toggle_button"></div>
         </div>
-
-        <div class="slot_machine_container">
-
-            <div class="slot_machine_reel_container">
-                <div class="slot_machine_reel slot_machine_reel1"></div>
-                <div class="slot_machine_reel slot_machine_reel2"></div>
-                <div class="slot_machine_reel slot_machine_reel3"></div>
-                <div class="reel_overlay"></div>
-            </div>
-
-            <div class="slot_machine_logged_out_message" style="display: none;"><span class="large">Sorry, you have been
-            logged off.</span><br/>
-                <b>No bids</b> have been deducted from this spin, because you're not logged in anymore.
-                Please <a href="/login">login</a> and try again.
-            </div>
-            <div class="slot_machine_failed_request_message" style="display: none;"><span class="large">Sorry, we're unable
-            to display your spin because your connection to our server was lost. </span><br/>
-                Rest assured that your spin was not wasted.
-                Please check your connection and <a href="#" onclick="window.location.reload();">refresh</a> to try
-                again.
-            </div>
-
-            <div class="slot_machine_controls">
-                <span class="slot_machine_output_last_win"></span>
-                <span class="slot_machine_output_balance"></span>
-                <span class="slot_machine_output_day_winnings">0</span>
-                <span class="slot_machine_output_lifetime_winnings"></span>
-                <span class="slot_machine_output_bet"></span>
-                <div class="slot_machine_bet_increase_button"></div>
-                <div class="slot_machine_bet_decrease_button"></div>
-            </div>
-
-            <div class="slot_machine_spin_button"></div>
-        </div>
-
-        <div class="slot_machine_sound_toggle_button"></div>
     </div>
-</div>
 
-<script type="text/javascript" src="js/jquery-1.7.1.min.js"></script>
-<script type="text/javascript" src="js/jquery-ui-1.8.17.custom.min.js"></script>
-<script type="text/javascript" src="js/soundmanager2.js"></script>
-<script type="text/javascript" src="js/setup.js"></script>
-<script type="text/javascript" src="js/slots.js"></script>
+    <div id="loginDialog" title="Login dialog" style="font-size: 1em">
+        <p>Welcome!
+            This is a slot machine UI, with Corda game logic, and players&rsquo; tokens in separate Corda accounts.
+            A new account is created for you automatically, when you press the Start button.
+        </p>
+        <p class="start"><button id="start" type="button">Start</button> &mdash; create a new account</p>
+        <p class="continue"><button id="continue" type="button">Continue</button> &mdash; continue with existing account
+        </p>
+        <p class="reset"><button id="reset" type="button">Reset</button> &mdash; create a different new account</p>
+        <p class="error"></p>
+        <fieldset>
+            <legend>Cookie:</legend>
+            <p><label><input type="checkbox" id="remember"> Remember me</label></p>
+            <ul>
+                <li>If you don&rsquo;t select &ldquo;Remember me&rdquo;, your device will forget your account name when
+                    you reload this page &mdash; then you can Start a new account, and play again.
+                    The abandoned account remains on the Corda node, but with a random name so nobody knows it was
+                    yours.
+                    </p>
+                </li>
+                <li>If you select &ldquo;Remember me&rdquo;, a cookie is created on this device to remember the account
+                    name &mdash; then when you reload the page you can continue to use the same account.
+                    <p>I think that according to <a href="https://gdpr.eu/cookies/" target="_blank">the GDPR</a> this
+                        would be an essential session cookie, not a &ldquo;preferences&rdquo; cookie &mdash; so we
+                        needn&rsquo;t (and won&rsquo;t) &ldquo;Document and store&rdquo; your consent for this cookie
+                        &mdash; but we won&rsquo;t even create it unless you select &ldquo;Remember me&rdquo;.</p>
+                    <p>The session cookie will expire after <span class="days"></span> days.</p>
+                </li>
+            </ul>
+        </fieldset>
+    </div>
+
+    <script type="text/javascript" src="js/jquery-1.7.1.min.js"></script>
+     <script type="text/javascript" src="js/jquery-ui.1.8.17.min.js"></script>
+    <script type="text/javascript" src="js/soundmanager2.js"></script>
+    <script type="text/javascript" src="js/setup.js"></script>
+    <script type="text/javascript" src="js/js.cookie.min.js"></script>
+    <script type="text/javascript" src="js/login.js"></script>
+    <script type="text/javascript" src="js/slots.js"></script>
 </body>
+
+
 
 </html>

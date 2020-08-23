@@ -13,18 +13,28 @@
     return { userID: 42, userBalance: 100 }; // FIXME
   }
   const { userID, userBalance } = getUserInfo();
-  window.remaining_balance = userBalance;
+  // here we're supposed to emulate GameUtils::DemandLoginOnRender() and Users::GetUserBalance($userID)
+  // we'll do this when the next script -- i.e. in login.js before slot.js
+  window.remaining_balance = 0;
 
   const gameType = "default"; // Modify on this line which game Type you'd like to show
   const ICONS_PER_REEL = 6;
 
   // this emulates Slots::GetGameSettings($gameType, true)
   function getGameSettings(gameType) {
-    return { game_type: gameType, min_bet: 1, max_bet: 1, icons_per_reel: ICONS_PER_REEL };
+    return {
+      game_type: gameType,
+      min_bet: 1,
+      max_bet: 1,
+      icons_per_reel: ICONS_PER_REEL,
+    };
   }
   const gameSettings = getGameSettings(gameType);
   const $elSlotsOuterContainer = $(".slot_machine_outer_container");
-  $elSlotsOuterContainer.attr("data-game-settings", JSON.stringify(gameSettings));
+  $elSlotsOuterContainer.attr(
+    "data-game-settings",
+    JSON.stringify(gameSettings)
+  );
 
   // this emulates PrizesAndReels::PrizesForGameType($gameType)
   function prizesForGameType(gameType) {
@@ -68,7 +78,11 @@
     return (
       "prize_" +
       (isNaN(rule)
-        ? rule.replace(/ /g, "").replace(/\*/g, "star").replace(/\./g, "dot").replace(/\//g, "slash")
+        ? rule
+            .replace(/ /g, "")
+            .replace(/\*/g, "star")
+            .replace(/\./g, "dot")
+            .replace(/\//g, "slash")
         : rule.toString())
     );
   }
@@ -83,15 +97,22 @@
   }
   const prizes = listPrizesForRendering(gameType);
   // this displays winning reels by adding to a template defined in the HTML
-  const $elPrizesList = $elSlotsOuterContainer.find(".slot_machine_prizes_list");
+  const $elPrizesList = $elSlotsOuterContainer.find(
+    ".slot_machine_prizes_list"
+  );
   const htmlTemplatePrizes = $("#template_prizes").html();
   prizes.forEach((prize) => {
     const $el = $(htmlTemplatePrizes);
-    $el.find(".slot_machine_prize_row").addClass("slot_machine_prize_row_" + prize.id);
+    $el
+      .find(".slot_machine_prize_row")
+      .addClass("slot_machine_prize_row_" + prize.id);
     $el.find(".slot_machine_prize_reel1").addClass(prize.reel1_classname);
     $el.find(".slot_machine_prize_reel2").addClass(prize.reel2_classname);
     $el.find(".slot_machine_prize_reel3").addClass(prize.reel3_classname);
-    $el.find(".slot_machine_prize_payout").attr("data-basePayout", prize.payout_winnings).text(prize.payout_winnings);
+    $el
+      .find(".slot_machine_prize_payout")
+      .attr("data-basePayout", prize.payout_winnings)
+      .text(prize.payout_winnings);
     $elPrizesList.append($el);
   });
   // this is custom code to define our non-standard interface with the web server
@@ -103,7 +124,11 @@
         if (payout === "0") return { reel1: "*", reel2: "*", reel3: "*" };
         const prize = prizes.find((it) => it.payout_winnings == payout);
         if (!prize) throw `Unsupported prize '${payout}'`;
-        return { reel1: prize.reel1_parsed, reel2: prize.reel2_parsed, reel3: prize.reel3_parsed };
+        return {
+          reel1: prize.reel1_parsed,
+          reel2: prize.reel2_parsed,
+          reel3: prize.reel3_parsed,
+        };
       }
       function forcedReelOutcome(rule) {
         if (rule === "*") rule = ["1", "2", "3", "4", "5", "6"];
@@ -112,7 +137,9 @@
       }
       function payoutForReels(reels) {
         function compareReel(outcome, rule) {
-          return Array.isArray(rule) ? rule.find((option) => option === outcome) : rule === outcome;
+          return Array.isArray(rule)
+            ? rule.find((option) => option === outcome)
+            : rule === outcome;
         }
         const found = prizes.find(
           (prize) =>
@@ -134,16 +161,62 @@
       throw `Failed to find reels for '${payout}'`;
     }
     function getResultReels(result) {
-      result.reels = getReelsForPayout(result.prize?result.prize.payout_credits:0);
+      result.reels = getReelsForPayout(
+        result.prize ? result.prize.payout_credits : 0
+      );
       return result;
     }
-    function getPostParameters() {
-      return { name: "anyname" };
+
+    function ajaxRequest(params, type, url, fnSuccess, fnError) {
+      $.ajax({
+        url: url,
+        type: type,
+        data: params,
+        dataType: "json",
+        timeout: 10000,
+        success: function (data) {
+          fnSuccess(data);
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+          const msg =
+            textStatus && errorThrown
+              ? `${textStatus} -- ${errorThrown}`
+              : textStatus
+              ? textStatus
+              : errorThrown
+              ? "" + errorThrown
+              : "Error";
+          return fnError(msg);
+        },
+      });
     }
-    function getUrl() {
-      return "/spin2";
+
+    // in future there may be additional parameters e.g. for the size of the bet
+    function spin(fnSuccess, fnError) {
+      const onSuccess = (spinResult) => {
+        if (!spinResult.success) {
+          fnError();
+          return;
+        }
+        try {
+          spinResult = getResultReels(spinResult);
+          fnSuccess(spinResult);
+        } catch (err) {
+          fnError();
+        }
+      };
+      ajaxRequest({ name: accountName }, "POST", "/spin", onSuccess, fnError);
     }
-    return { getResultReels, getPostParameters, getUrl };
+
+    function create(accountName, fnSuccess, fnError) {
+      ajaxRequest({ name: accountName }, "POST", "/create", fnSuccess, fnError);
+    }
+
+    function balance(accountName, fnSuccess, fnError) {
+      ajaxRequest({ name: accountName }, "GET", "/balance", fnSuccess, fnError);
+    }
+
+    return { spin, create, balance };
   }
   window.ioServer = ioServer();
 })();

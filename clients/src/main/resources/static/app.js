@@ -4,42 +4,67 @@
 
 $(window).on("load", function () {
   function setMessage(message) {
+    if (typeof message === "object")
+      message = `object: ${JSON.stringify(message)}`;
     $("#message").html("Result: " + message);
   }
 
-  function makeRequest(params, url, dataType = "text") {
+  function makeRequest(params, url, type, dataType = "text") {
     // https://api.jquery.com/jQuery.ajax/
     $.ajax({
       url: url,
-      type: params ? "POST" : "GET",
+      type: type,
       data: params,
-      dataType: "text",
+      dataType: dataType,
       timeout: 10000,
       success: function (data) {
         setMessage(data);
         return false;
       },
-      error: function () {
-        setMessage("error!");
+      error: function (jqXHR, textStatus, errorThrown) {
+        const msg =
+          textStatus && errorThrown
+            ? `${textStatus} -- ${errorThrown}`
+            : textStatus
+            ? textStatus
+            : errorThrown
+            ? "" + errorThrown
+            : "Error?!";
+        setMessage(msg);
         return false;
       },
     });
   }
 
+  function uuidv4() {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (
+      c
+    ) {
+      var r = (Math.random() * 16) | 0,
+        v = c == "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  const accountNameParams = { name: uuidv4() };
+
   $("#test").click(function () {
-    makeRequest(null, "/test");
+    makeRequest(null, "/test", "GET");
   });
   $("#echo").click(function () {
-    makeRequest({ payload: "OK" }, "/echo");
+    makeRequest({ payload: "OK" }, "/echo", "GET");
   });
   $("#create").click(function () {
-    makeRequest({ name: "anyname" }, "/create");
+    makeRequest(accountNameParams, "/create", "POST");
+  });
+  $("#balance").click(function () {
+    makeRequest(accountNameParams, "/balance", "GET");
+  });
+  $("#payout").click(function () {
+    makeRequest(accountNameParams, "/payout", "POST");
   });
   $("#spin").click(function () {
-    makeRequest({ name: "anyname" }, "/spin");
-  });
-  $("#spin2").click(function () {
-    makeRequest({ name: "anyname" }, "/spin2", "json");
+    makeRequest(accountNameParams, "/spin", "POST", "json");
   });
   $("#reels").click(function () {
     function getReels(payout) {
