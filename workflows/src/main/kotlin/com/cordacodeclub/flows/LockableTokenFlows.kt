@@ -75,4 +75,59 @@ object LockableTokenFlows {
             override fun call() = subFlow(ReceiveFinalityFlow(issuerSession))
         }
     }
+
+    object Fetch {
+        const val PAGE_SIZE_DEFAULT = 200
+
+        /**
+         * Fetches enough tokens issued by issuer and held by holder to cover the required amount.
+         * The soft lock id it typically FlowLogic.currentTopLevel?.runId?.uuid ?: throw FlowException("No running id")
+         * so that they can be automatically locked until the flow is ended or killed.
+         */
+        class Local(private val holder: AbstractParty,
+                    private val issuer: AbstractParty,
+                    private val requiredAmount: Long,
+                    private val softLockId: UUID) :
+                FlowLogic<List<StateAndRef<LockableTokenState>>>() {
+
+            init {
+                require(0L < requiredAmount) { "The amount must be strictly positive" }
+            }
+
+            @Suspendable
+            override fun call(): List<StateAndRef<LockableTokenState>> {
+                val criteria = QueryCriteria.VaultQueryCriteria(
+                        contractStateTypes = setOf(LockableTokenState::class.java),
+                        softLockingCondition = QueryCriteria.SoftLockingCondition(
+                                QueryCriteria.SoftLockingType.UNLOCKED_AND_SPECIFIED,
+                                listOf(softLockId)),
+                        relevancyStatus = Vault.RelevancyStatus.RELEVANT,
+                        status = Vault.StateStatus.UNCONSUMED
+                ).and(QueryCriteria.VaultCustomQueryCriteria(builder {
+                    LockableTokenSchemaV1.PersistentLockableToken::issuer.equal(issuer.owningKey.encoded)
+                })
+                ).and(QueryCriteria.VaultCustomQueryCriteria(builder {
+                    LockableTokenSchemaV1.PersistentLockableToken::holder.equal(holder.owningKey.encoded)
+                }))
+
+                var pageNumber = DEFAULT_PAGE_NUM
+                var claimedAmount = 0L
+                val fetched = mutableListOf<StateAndRef<LockableTokenState>>()
+                do {
+                    val pageSpec = PageSpecification(pageNumber = pageNumber, pageSize = PAGE_SIZE_DEFAULT)
+                    val results: Vault.Page<LockableTokenState> = serviceHub.vaultService.queryBy(
+                            LockableTokenState::class.java, criteria, pageSpec)
+                    for (state in results.states) {
+                        fetched += state
+                        claimedAmount = Math.addExact(claimedAmount, state.state.data.amount.quantity)
+                        if (requiredAmount <= claimedAmount) break
+                    }
+                    pageNumber++
+                } while (claimedAmount < requiredAmount && (pageSpec.pageSize * (pageNumber - 1)) <= results.totalStatesAvailable)
+                if (claimedAmount < requiredAmount) throw FlowException("Not enough tokens")
+                serviceHub.vaultService.softLockReserve(softLockId, fetched.map { it.ref }.toNonEmptySet())
+                return fetched
+            }
+        }
+    }
 }
