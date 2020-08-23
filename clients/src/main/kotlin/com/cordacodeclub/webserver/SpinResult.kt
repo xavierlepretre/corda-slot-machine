@@ -13,17 +13,20 @@ data class SpinResult(
         val success: Boolean,
         val error: String?,
         val prize: Prize?,
-        val balance: Int
+        val balance: Int,
+        val day_winnings: Int,
+        val lifetime_winnings: Int,
+        val last_win: Int
 ) {
 
     constructor(result: GameResult) : this(
             result.error == null,
             result.error,
             if (result.payout_credits != 0) Prize(result.payout_credits) else null,
-            result.balance
+            result.balance, 0, 0, 0
     )
 
     constructor(error: String) : this(
-            false, error, null, 0
+            false, error, null, 0, 0, 0, 0
     )
 }

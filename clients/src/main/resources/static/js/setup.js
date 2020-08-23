@@ -104,7 +104,7 @@
   prizes.forEach((prize) => {
     const $el = $(htmlTemplatePrizes);
     $el
-      .find(".slot_machine_prize_row")
+      // .find(".slot_machine_prize_row")
       .addClass("slot_machine_prize_row_" + prize.id);
     $el.find(".slot_machine_prize_reel1").addClass(prize.reel1_classname);
     $el.find(".slot_machine_prize_reel2").addClass(prize.reel2_classname);
@@ -117,17 +117,24 @@
   });
   // this is custom code to define our non-standard interface with the web server
   function ioServer() {
+    let last_win = 0;
+
     // this emulates PrizesAndReels::ReelsForPrizeID
     // which the PHP would call from RandomLogic::PrizeAndReels after selecting a prize
     function getReelsForPayout(payout) {
       function getParsedRules(payout) {
-        if (payout === "0") return { reel1: "*", reel2: "*", reel3: "*" };
+        if (!payout)
+          return { rules: { reel1: "*", reel2: "*", reel3: "*" } };
+        last_win = payout;
         const prize = prizes.find((it) => it.payout_winnings == payout);
         if (!prize) throw `Unsupported prize '${payout}'`;
         return {
-          reel1: prize.reel1_parsed,
-          reel2: prize.reel2_parsed,
-          reel3: prize.reel3_parsed,
+          id: prize.id,
+          rules: {
+            reel1: prize.reel1_parsed,
+            reel2: prize.reel2_parsed,
+            reel3: prize.reel3_parsed,
+          },
         };
       }
       function forcedReelOutcome(rule) {
@@ -149,21 +156,26 @@
         );
         return found ? found.payout_credits : 0;
       }
-      const parsedRules = getParsedRules(payout);
+
+      const { rules, id } = getParsedRules(payout);
       for (let i = 0; i < 1000; ++i) {
         const reels = [
-          forcedReelOutcome(parsedRules.reel1),
-          forcedReelOutcome(parsedRules.reel2),
-          forcedReelOutcome(parsedRules.reel3),
+          forcedReelOutcome(rules.reel1),
+          forcedReelOutcome(rules.reel2),
+          forcedReelOutcome(rules.reel3),
         ];
-        if (payoutForReels(reels) == payout) return reels;
+        if (payoutForReels(reels) == payout) return { id, reels };
       }
       throw `Failed to find reels for '${payout}'`;
     }
+
     function getResultReels(result) {
-      result.reels = getReelsForPayout(
+      const { reels, id } = getReelsForPayout(
         result.prize ? result.prize.payout_credits : 0
       );
+      result.reels = reels;
+      if (id) result.prize.id = id;
+      result.last_win = last_win;
       return result;
     }
 
