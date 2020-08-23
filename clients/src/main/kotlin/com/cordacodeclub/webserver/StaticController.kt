@@ -5,13 +5,10 @@ import org.springframework.web.bind.annotation.GetMapping
 
 @Controller
 class StaticController {
-  @GetMapping("/login")
+  @GetMapping("/test")
   fun login(): String {
-    return "login.html"
+    return "test.html"
   }
 
-  @GetMapping("/cookies")
-  fun cookies(): String {
-    return "cookies.html"
-  }
+  // we could add more here -- e.g. /about and /legal etc.
 }
