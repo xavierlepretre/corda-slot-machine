@@ -18,6 +18,46 @@ class LockableTokenContract : Contract {
         val outputsKey = 2
     }
 
+    interface HasInputs {
+        val inputIndices: List<Int>
+    }
+
+    interface HasOutputs {
+        val outputIndices: List<Int>
+    }
+
+    sealed class Commands : CommandData {
+        class Issue(override val outputIndices: List<Int>) : Commands(), HasOutputs {
+            init {
+                require(outputIndices.isNotEmpty()) { "Issue must have outputs" }
+            }
+        }
+
+        class Lock(override val inputIndices: List<Int>,
+                   override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
+            init {
+                require(inputIndices.isNotEmpty()) { "Lock must have inputs" }
+                require(outputIndices.isNotEmpty()) { "Lock must have outputs" }
+            }
+        }
+
+        class Release(override val inputIndices: List<Int>,
+                      override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
+            init {
+                require(inputIndices.isNotEmpty()) { "Release must have inputs" }
+                require(outputIndices.isNotEmpty()) { "Release must have outputs" }
+            }
+        }
+
+        class Redeem(override val inputIndices: List<Int>,
+                     override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
+            init {
+                require(inputIndices.isNotEmpty()) { "Redeem must have inputs" }
+                // There may be no outputs.
+            }
+        }
+    }
+
     override fun verify(tx: LedgerTransaction) {
         val commands = tx.commandsOfType<Commands>()
 
@@ -140,45 +180,5 @@ class LockableTokenContract : Contract {
         "All lockable token outputs must be covered by a command" using (
                 coveredOutputs.size == allLockableOutputs.size
                         && coveredOutputs.containsAll(allLockableOutputs))
-    }
-
-    sealed class Commands : CommandData {
-        class Issue(override val outputIndices: List<Int>) : Commands(), HasOutputs {
-            init {
-                require(outputIndices.isNotEmpty()) { "Issue must have outputs" }
-            }
-        }
-
-        class Lock(override val inputIndices: List<Int>,
-                   override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
-            init {
-                require(inputIndices.isNotEmpty()) { "Lock must have inputs" }
-                require(outputIndices.isNotEmpty()) { "Lock must have outputs" }
-            }
-        }
-
-        class Release(override val inputIndices: List<Int>,
-                      override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
-            init {
-                require(inputIndices.isNotEmpty()) { "Release must have inputs" }
-                require(outputIndices.isNotEmpty()) { "Release must have outputs" }
-            }
-        }
-
-        class Redeem(override val inputIndices: List<Int>,
-                     override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
-            init {
-                require(inputIndices.isNotEmpty()) { "Redeem must have inputs" }
-                // There may be no outputs.
-            }
-        }
-    }
-
-    interface HasInputs {
-        val inputIndices: List<Int>
-    }
-
-    interface HasOutputs {
-        val outputIndices: List<Int>
     }
 }

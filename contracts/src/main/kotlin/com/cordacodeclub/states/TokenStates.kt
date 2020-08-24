@@ -21,6 +21,10 @@ class LockableTokenState private constructor(
         val issuer: AbstractParty,
         val amount: Amount<LockableTokenType>) : ContractState, QueryableState {
 
+    init {
+        require(isLocked == (holder == null)) { "Is locked should reflect that holder is null" }
+    }
+
     constructor(issuer: AbstractParty, amount: Amount<LockableTokenType>)
             : this(null, true, issuer, amount)
 
@@ -28,6 +32,8 @@ class LockableTokenState private constructor(
             : this(holder, false, issuer, amount)
 
     override val participants = listOfNotNull(holder)
+            .takeIf { it.isNotEmpty() }
+            ?: listOf(issuer)
 
     override fun generateMappedObject(schema: MappedSchema): PersistentState {
         return when (schema) {
@@ -48,12 +54,10 @@ class LockableTokenState private constructor(
 
         other as LockableTokenState
 
-        if (holder != other.holder) return false
-        if (isLocked != other.isLocked) return false
-        if (issuer != other.issuer) return false
-        if (amount != other.amount) return false
-
-        return true
+        return holder == other.holder
+                && isLocked == other.isLocked
+                && issuer == other.issuer
+                && amount == other.amount
     }
 
     override fun hashCode(): Int {
