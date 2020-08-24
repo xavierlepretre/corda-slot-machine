@@ -160,7 +160,7 @@ class LockableTokenContract : Contract {
                     ?: listOf()
 
             inputPairs.plus(outputPairs)
-        }.toMultiMap()
+        }.groupBy({ it.first }) { it.second }
 
         val coveredInputs = coveredLockableStates[inputsKey] ?: listOf()
         val coveredOutputs = coveredLockableStates[outputsKey] ?: listOf()

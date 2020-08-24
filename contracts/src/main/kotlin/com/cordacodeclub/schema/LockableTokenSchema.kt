@@ -1,15 +1,10 @@
 package com.cordacodeclub.schema
 
-import net.corda.core.identity.AbstractParty
-import net.corda.core.identity.CordaX500Name
-import net.corda.core.identity.Party
 import net.corda.core.schemas.MappedSchema
 import net.corda.core.schemas.PersistentState
-import net.i2p.crypto.eddsa.EdDSAPublicKey
-import java.security.PublicKey
-import java.security.spec.X509EncodedKeySpec
 import javax.persistence.Column
 import javax.persistence.Entity
+import javax.persistence.Index
 import javax.persistence.Table
 
 /**
@@ -24,14 +19,23 @@ object LockableTokenSchemaV1 : MappedSchema(
         schemaFamily = LockableTokenSchema.javaClass,
         version = 1,
         mappedTypes = listOf(PersistentLockableToken::class.java)) {
+
+    const val COL_HOLDER = "holder"
+    const val COL_ISSUER = "issuer"
+    const val COL_AMOUNT = "amount"
+
     @Entity
-    @Table(name = "lockable_token_states")
+    @Table(name = "lockable_token_states",
+            indexes = [
+                Index(name = "lockable_token_holder_ids", columnList = COL_HOLDER),
+                Index(name = "lockable_token_issuer_idx", columnList = COL_ISSUER)
+            ])
     class PersistentLockableToken(
-            @Column(name = "holder")
+            @Column(name = COL_HOLDER)
             var holder: ByteArray?,
-            @Column(name = "issuer", nullable = false)
+            @Column(name = COL_ISSUER, nullable = false)
             var issuer: ByteArray,
-            @Column(name = "amount", nullable = false)
+            @Column(name = COL_AMOUNT, nullable = false)
             var amount: Long) : PersistentState() {
         // Default constructor required by hibernate.
         constructor() : this(null, ByteArray(0), 0)

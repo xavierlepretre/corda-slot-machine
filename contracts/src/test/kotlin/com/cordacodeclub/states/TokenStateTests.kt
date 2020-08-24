@@ -1,13 +1,9 @@
 package com.cordacodeclub.states
 
 import net.corda.core.contracts.Amount
-import net.corda.core.contracts.StateRef
-import net.corda.core.contracts.StaticPointer
-import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.core.TestIdentity
 import org.junit.Test
-import java.util.*
 import kotlin.test.assertEquals
 
 class TokenStateTests {

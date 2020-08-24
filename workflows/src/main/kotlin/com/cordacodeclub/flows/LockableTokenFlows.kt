@@ -118,6 +118,10 @@ object LockableTokenFlows {
                     val results: Vault.Page<LockableTokenState> = serviceHub.vaultService.queryBy(
                             LockableTokenState::class.java, criteria, pageSpec)
                     for (state in results.states) {
+                        // TODO confirm that this should never happen. Worried about ByteArray's length.
+                        // https://github.com/xavierlepretre/corda-slot-machine/issues/23
+                        if (state.state.data.let { it.holder != holder || it.issuer != issuer })
+                            throw FlowException("The query returned a state that had wrong holder or issuer")
                         fetched += state
                         claimedAmount = Math.addExact(claimedAmount, state.state.data.amount.quantity)
                         if (requiredAmount <= claimedAmount) break
