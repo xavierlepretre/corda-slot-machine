@@ -45,6 +45,7 @@ class CommitContract : Contract {
                                     .let { listOf(inputsKey to it.first.ref, outputsKey to it.second.ref) }
                         is Commands.Use ->
                             listOf(inputsKey to verifyUse(tx, command.value as Commands.Use, command.signers, inputIds).ref)
+                        is Commands.Resolve -> listOf(inputsKey to verifyClosure(tx, command.value as Commands.Use, command.signers, inputIds).ref)
                     }
                 }
                 .toMultiMap()
@@ -142,10 +143,20 @@ class CommitContract : Contract {
         return tx.inRef(use.inputIndex)
     }
 
+    private fun verifyClosure(
+            tx: LedgerTransaction,
+            use: Commands.Use,
+            signers: List<PublicKey>,
+            inputIds: Map<UniqueIdentifier, List<LinearState>>
+    ): StateAndRef<RevealedState> {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
     sealed class Commands : CommandData {
         class Commit(val outputIndex: Int) : Commands()
         class Reveal(val inputIndex: Int, val outputIndex: Int) : Commands()
         class Use(val inputIndex: Int) : Commands()
+        class Resolve : Commands()
     }
 
 }
