@@ -113,7 +113,7 @@ class LockableTokenFetchFlowsTest {
     fun `cannot fetch issued token when not enough`() {
         issueToken(issuerNode, holder1, issuer, 200L)
         val fetched = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
-                holder1, issuer, 101L, UUID.randomUUID()))
+                holder1, issuer, 201L, UUID.randomUUID()))
                 .also { network.runNetwork() }
         val exception = assertThrows<ExecutionException> { fetched.get() }
         assertEquals(FlowException::class.java, exception.cause!!::class.java)
@@ -140,6 +140,73 @@ class LockableTokenFetchFlowsTest {
         val exception = assertThrows<ExecutionException> { fetched.get() }
         assertEquals(FlowException::class.java, exception.cause!!::class.java)
         assertEquals("Not enough tokens", exception.cause!!.message)
+    }
+
+    @Test
+    fun `can fetch issued tokens of 2 holders just equal`() {
+        val issuedTokens = issueToken(issuerNode, listOf(holder1 to 100L, holder2 to 50L), issuer)
+        val fetched2 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
+                holder2, issuer, 50L, UUID.randomUUID()))
+                .also { network.runNetwork() }
+                .get()
+        assertEquals(1, fetched2.size)
+        assertEquals(issuedTokens[1], fetched2[0])
+        val fetched1 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
+                holder1, issuer, 100L, UUID.randomUUID()))
+                .also { network.runNetwork() }
+                .get()
+        assertEquals(1, fetched1.size)
+        assertEquals(issuedTokens[0], fetched1[0])
+    }
+
+    @Test
+    fun `can fetch soft locked tokens if give right uuid`() {
+        val issuedTokens = issueToken(issuerNode, listOf(holder1 to 100L, holder1 to 50L), issuer)
+        val fetchId1 = UUID.randomUUID()
+        val fetched1 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
+                holder1, issuer, 100L, fetchId1))
+                .also { network.runNetwork() }
+                .get()
+        assertEquals(1, fetched1.size)
+        assertEquals(issuedTokens[0], fetched1[0])
+        val fetched2 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
+                holder1, issuer, 101L, fetchId1))
+                .also { network.runNetwork() }
+                .get()
+        assertEquals(2, fetched2.size)
+        assertEquals(issuedTokens, fetched2)
+     }
+
+    @Test
+    fun `because of soft lock will fetch other token of holder just equal`() {
+        val issuedTokens = issueToken(issuerNode, listOf(holder1 to 100L, holder1 to 50L), issuer)
+        val fetchId1 = UUID.randomUUID()
+        val fetched1 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
+                holder1, issuer, 100L, fetchId1))
+                .also { network.runNetwork() }
+                .get()
+        assertEquals(1, fetched1.size)
+        assertEquals(issuedTokens[0], fetched1[0])
+        val fetchId2 = UUID.randomUUID()
+        val fetched2 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
+                holder1, issuer, 50L, fetchId2))
+                .also { network.runNetwork() }
+                .get()
+        assertEquals(1, fetched2.size)
+        assertEquals(issuedTokens[1], fetched2[0])
+        val fetched3 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
+                holder1, issuer, 1L, UUID.randomUUID()))
+                .also { network.runNetwork() }
+        val exception = assertThrows<ExecutionException> { fetched3.get() }
+        assertEquals(FlowException::class.java, exception.cause!!::class.java)
+        assertEquals("Not enough tokens", exception.cause!!.message)
+        holderNode.transaction { holderNode.services.vaultService.softLockRelease(fetchId1) }
+        val fetched4 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
+                holder1, issuer, 1L, UUID.randomUUID()))
+                .also { network.runNetwork() }
+                .get()
+        assertEquals(1, fetched4.size)
+        assertEquals(issuedTokens[0], fetched4[0])
     }
 
 }

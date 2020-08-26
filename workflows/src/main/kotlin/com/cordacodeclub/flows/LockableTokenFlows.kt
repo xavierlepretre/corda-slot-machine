@@ -83,6 +83,8 @@ object LockableTokenFlows {
          * Fetches enough tokens issued by issuer and held by holder to cover the required amount.
          * The soft lock id it typically FlowLogic.currentTopLevel?.runId?.uuid ?: throw FlowException("No running id")
          * so that they can be automatically locked until the flow is ended or killed.
+         * This code was inspired by the similar function found in the Token SDK here:
+         * https://github.com/corda/token-sdk/blob/22e18e6/modules/selection/src/main/kotlin/com.r3.corda.lib.tokens.selection/database/selector/DatabaseTokenSelection.kt#L57-L110
          */
         class Local(private val holder: AbstractParty,
                     private val issuer: AbstractParty,
