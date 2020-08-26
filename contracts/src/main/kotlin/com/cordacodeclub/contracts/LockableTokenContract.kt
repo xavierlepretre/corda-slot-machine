@@ -27,12 +27,20 @@ class LockableTokenContract : Contract {
     }
 
     sealed class Commands : CommandData {
+        /**
+         * An [Issue] indicates that unlocked tokens are created out thin air.
+         */
         class Issue(override val outputIndices: List<Int>) : Commands(), HasOutputs {
             init {
                 require(outputIndices.isNotEmpty()) { "Issue must have outputs" }
             }
         }
 
+        /**
+         * A [Lock] indicates that some of the input tokens are being locked. In effect that there are more locked
+         * tokens in outputs than there are in inputs. This implies that there can be locked tokens in inputs and
+         * unlocked tokens in outputs.
+         */
         class Lock(override val inputIndices: List<Int>,
                    override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
             init {
@@ -41,6 +49,11 @@ class LockableTokenContract : Contract {
             }
         }
 
+        /**
+         * A [Release] indicates that some of the input tokens are being released. In effect that there are more locked
+         * tokens in inputs than there are in outputs. This implies that there can be unlocked tokens in inputs and
+         * locked tokens in outputs.
+         */
         class Release(override val inputIndices: List<Int>,
                       override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
             init {
@@ -49,6 +62,10 @@ class LockableTokenContract : Contract {
             }
         }
 
+        /**
+         * A [Redeem] indicates that some of the inputs tokens are being destroyed. In effect that there are more tokens
+         * in inputs than there an in outputs. It only deals with unlocked tokens.
+         */
         class Redeem(override val inputIndices: List<Int>,
                      override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
             init {
@@ -76,7 +93,8 @@ class LockableTokenContract : Contract {
             "The outputs must be lockable token states" using rawOutputs.all { it is LockableTokenState }
             val inputs = rawInputs.filterIsInstance<LockableTokenState>()
             val outputs = rawOutputs.filterIsInstance<LockableTokenState>()
-            // The inputs can have 0 values
+            // The inputs can have 0 values as this can assist in mopping up badly created states.
+            // It should never happen, though.
             "The outputs must have positive amounts" using outputs.all { 0 < it.amount.quantity }
             val inputIssuers = inputs.map { it.issuer }.distinct()
             val outputIssuers = outputs.map { it.issuer }.distinct()

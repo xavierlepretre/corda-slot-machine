@@ -2,6 +2,7 @@ package com.cordacodeclub.schema
 
 import net.corda.core.schemas.MappedSchema
 import net.corda.core.schemas.PersistentState
+import org.hibernate.annotations.Type
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Index
@@ -32,8 +33,10 @@ object LockableTokenSchemaV1 : MappedSchema(
             ])
     class PersistentLockableToken(
             @Column(name = COL_HOLDER)
+            @Type(type = "corda-wrapper-binary")
             var holder: ByteArray?,
             @Column(name = COL_ISSUER, nullable = false)
+            @Type(type = "corda-wrapper-binary")
             var issuer: ByteArray,
             @Column(name = COL_AMOUNT, nullable = false)
             var amount: Long) : PersistentState() {
