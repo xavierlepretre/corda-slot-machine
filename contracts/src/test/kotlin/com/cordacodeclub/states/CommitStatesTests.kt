@@ -23,10 +23,10 @@ class CommitStatesTests {
 
     @Test
     fun `CommittedState creator must be in the participants`() {
-        assertFailsWith<IllegalArgumentException>() {
+        assertFailsWith<IllegalArgumentException> {
             CommittedState(SecureHash.allOnesHash, alice, Instant.now(), 1, UniqueIdentifier(), listOf())
         }
-        assertFailsWith<IllegalArgumentException>() {
+        assertFailsWith<IllegalArgumentException> {
             CommittedState(SecureHash.allOnesHash, alice, Instant.now(), 1, UniqueIdentifier(), listOf(bob))
         }
         CommittedState(SecureHash.allOnesHash, alice, Instant.now(), 1, UniqueIdentifier(), listOf(alice))
@@ -34,13 +34,12 @@ class CommitStatesTests {
 
     @Test
     fun `RevealedState creator must be in the participants`() {
-        assertFailsWith<IllegalArgumentException>() {
+        assertFailsWith<IllegalArgumentException> {
             RevealedState(CommitImage.createRandom(random), alice, basicGame, UniqueIdentifier(), listOf())
         }
-        assertFailsWith<IllegalArgumentException>() {
+        assertFailsWith<IllegalArgumentException> {
             RevealedState(CommitImage.createRandom(random), alice, basicGame, UniqueIdentifier(), listOf(bob))
         }
         RevealedState(CommitImage.createRandom(random), alice, basicGame, UniqueIdentifier(), listOf(alice))
     }
-
 }
