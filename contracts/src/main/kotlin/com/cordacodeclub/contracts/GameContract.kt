@@ -13,8 +13,8 @@ class GameContract : Contract {
 
     companion object {
         val id = GameContract::class.java.canonicalName
-        val inputsKey = 1
-        val outputsKey = 2
+        const val inputsKey = 1
+        const val outputsKey = 2
     }
 
     override fun verify(tx: LedgerTransaction) {
@@ -41,7 +41,7 @@ class GameContract : Contract {
                 }
 
         val coveredStates = tx.commandsOfType<Commands>()
-                .also { require (it.isNotEmpty()) { "The GameContract must find at least 1 command" } }
+                .also { require(it.isNotEmpty()) { "The GameContract must find at least 1 command" } }
                 .flatMap { command ->
                     when (command.value) {
                         is Commands.Create ->

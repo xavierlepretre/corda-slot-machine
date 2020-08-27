@@ -1,5 +1,8 @@
 package com.cordacodeclub.contracts
 
+import com.cordacodeclub.contracts.CommitContract.Commands.*
+import com.cordacodeclub.contracts.GameContract.Commands.Create
+import com.cordacodeclub.contracts.GameContract.Commands.Resolve
 import com.cordacodeclub.states.*
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.StaticPointer
@@ -40,9 +43,9 @@ class GameContractResolveTests {
         output(CommitContract.id, CommittedState(playerHash, player,
                 Instant.now().plusSeconds(30), 2, playerId))
         output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
-        command(casino.owningKey, CommitContract.Commands.Commit(0))
-        command(player.owningKey, CommitContract.Commands.Commit(1))
-        command(player.owningKey, GameContract.Commands.Create(2))
+        command(casino.owningKey, Commit(0))
+        command(player.owningKey, Commit(1))
+        command(player.owningKey, Create(2))
         verifies()
     }
 
@@ -52,7 +55,7 @@ class GameContractResolveTests {
         input(committedRef.ref)
         output(CommitContract.id, RevealedState(image, committed.creator, committedRef.getGamePointer(),
                 committed.linearId))
-        command(committed.creator.owningKey, CommitContract.Commands.Reveal(0, 0))
+        command(committed.creator.owningKey, Reveal(0, 0))
         reference(committedRef.getGamePointer().pointer)
         timeWindow(TimeWindow.untilOnly(committed.revealDeadline))
         verifies()
@@ -71,16 +74,16 @@ class GameContractResolveTests {
             transaction {
                 input(casinoRevealRef.ref)
                 input(playerRevealRef.ref)
-                command(player.owningKey, CommitContract.Commands.Use(0))
-                command(player.owningKey, CommitContract.Commands.Use(1))
+                command(player.owningKey, Use(0))
+                command(player.owningKey, Use(1))
                 input(gameRef.ref)
 
                 tweak {
-                    command(player.owningKey, GameContract.Commands.Resolve(1))
+                    command(player.owningKey, Resolve(1))
                     failsWith("The input must be a GameState")
                 }
 
-                command(player.owningKey, GameContract.Commands.Resolve(2))
+                command(player.owningKey, Resolve(2))
                 verifies()
             }
         }
@@ -97,9 +100,9 @@ class GameContractResolveTests {
             val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
             transaction {
-                command(player.owningKey, GameContract.Commands.Resolve(0))
-                command(player.owningKey, CommitContract.Commands.Use(1))
-                command(player.owningKey, CommitContract.Commands.Use(2))
+                command(player.owningKey, Resolve(0))
+                command(player.owningKey, Use(1))
+                command(player.owningKey, Use(2))
 
                 tweak {
                     input(GameContract.id, gameRef.state.data.copy(commitIds = listOf(
@@ -130,9 +133,9 @@ class GameContractResolveTests {
             transaction {
                 input(gameRef.ref)
                 input(casinoRevealRef.ref)
-                command(player.owningKey, GameContract.Commands.Resolve(0))
-                command(player.owningKey, CommitContract.Commands.Use(1))
-                command(player.owningKey, CommitContract.Commands.Use(2))
+                command(player.owningKey, Resolve(0))
+                command(player.owningKey, Use(1))
+                command(player.owningKey, Use(2))
 
                 tweak {
                     input(CommitContract.id, playerRevealRef.state.data

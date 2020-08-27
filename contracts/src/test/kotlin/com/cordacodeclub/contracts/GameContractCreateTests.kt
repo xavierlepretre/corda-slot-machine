@@ -1,5 +1,7 @@
 package com.cordacodeclub.contracts
 
+import com.cordacodeclub.contracts.CommitContract.Commands.Commit
+import com.cordacodeclub.contracts.GameContract.Commands.Create
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.GameState
 import net.corda.core.contracts.UniqueIdentifier
@@ -33,12 +35,12 @@ class GameContractCreateTests {
                     Instant.now(), 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     Instant.now(), 2, playerId))
-            command(casino.owningKey, CommitContract.Commands.Commit(0))
-            command(player.owningKey, CommitContract.Commands.Commit(1))
+            command(casino.owningKey, Commit(0))
+            command(player.owningKey, Commit(1))
             output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
             failsWith("The GameContract must find at least 1 command")
 
-            command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(2))
+            command(listOf(casino.owningKey, player.owningKey), Create(2))
             verifies()
         }
     }
@@ -52,16 +54,16 @@ class GameContractCreateTests {
                     Instant.now(), 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     Instant.now(), 2, playerId))
-            command(casino.owningKey, CommitContract.Commands.Commit(0))
-            command(player.owningKey, CommitContract.Commands.Commit(1))
+            command(casino.owningKey, Commit(0))
+            command(player.owningKey, Commit(1))
             output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
 
             tweak {
-                command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(1))
+                command(listOf(casino.owningKey, player.owningKey), Create(1))
                 failsWith("The output must be a GameState")
             }
 
-            command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(2))
+            command(listOf(casino.owningKey, player.owningKey), Create(2))
             verifies()
         }
     }
@@ -77,13 +79,13 @@ class GameContractCreateTests {
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     Instant.now(), 2, playerId))
             output(GameContract.id, GameState(listOf(casinoId, playerId), gameId1, listOf(casino, player)))
-            command(casino.owningKey, CommitContract.Commands.Commit(0))
-            command(player.owningKey, CommitContract.Commands.Commit(1))
-            command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(2))
+            command(casino.owningKey, Commit(0))
+            command(player.owningKey, Commit(1))
+            command(listOf(casino.owningKey, player.owningKey), Create(2))
             verifies()
 
             output(GameContract.id, GameState(listOf(casinoId, gameId1), UniqueIdentifier(), listOf(casino, player)))
-            command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(3))
+            command(listOf(casino.owningKey, player.owningKey), Create(3))
             failsWith("The commit ids must all be associated CommittedStates")
         }
     }
@@ -99,13 +101,13 @@ class GameContractCreateTests {
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     Instant.now(), 2, playerId))
             output(GameContract.id, GameState(listOf(casinoId, playerId), gameId1, listOf(casino, player)))
-            command(casino.owningKey, CommitContract.Commands.Commit(0))
-            command(player.owningKey, CommitContract.Commands.Commit(1))
-            command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(2))
+            command(casino.owningKey, Commit(0))
+            command(player.owningKey, Commit(1))
+            command(listOf(casino.owningKey, player.owningKey), Create(2))
             verifies()
 
             output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
-            command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(3))
+            command(listOf(casino.owningKey, player.owningKey), Create(3))
             failsWith("The commit ids must all be associated CommittedStates")
         }
     }

@@ -13,8 +13,8 @@ class CommitContract : Contract {
 
     companion object {
         val id = CommitContract::class.java.canonicalName
-        val inputsKey = 1
-        val outputsKey = 2
+        const val inputsKey = 1
+        const val outputsKey = 2
     }
 
     override fun verify(tx: LedgerTransaction) {

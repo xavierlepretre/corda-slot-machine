@@ -14,8 +14,8 @@ class LockableTokenContract : Contract {
 
     companion object {
         val id = LockableTokenContract::class.java.canonicalName
-        val inputsKey = 1
-        val outputsKey = 2
+        const val inputsKey = 1
+        const val outputsKey = 2
     }
 
     interface HasInputs {
