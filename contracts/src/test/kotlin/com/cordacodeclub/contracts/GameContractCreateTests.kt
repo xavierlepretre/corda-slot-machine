@@ -112,4 +112,30 @@ class GameContractCreateTests {
         }
     }
 
+    @Test
+    fun `Created game commits must have the same reveal deadline`() {
+        ledgerServices.transaction {
+            val casinoId = UniqueIdentifier()
+            val playerId = UniqueIdentifier()
+            val gameId1 = UniqueIdentifier()
+            val revealDeadline = Instant.now()
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
+                    revealDeadline, 1, casinoId))
+            output(GameContract.id, GameState(listOf(casinoId, playerId), gameId1, listOf(casino, player)))
+            command(casino.owningKey, Commit(0))
+            command(player.owningKey, Commit(2))
+            command(listOf(casino.owningKey, player.owningKey), Create(1))
+
+            tweak {
+                output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
+                        revealDeadline.plusSeconds(1), 1, playerId))
+                failsWith("The commits must all have the same reveal deadline")
+            }
+
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
+                    revealDeadline, 1, playerId))
+            verifies()
+        }
+    }
+
 }
