@@ -1,11 +1,11 @@
-Here are notes about the web server in the ./clients directory.
+Here are notes about the web server in the `./clients` directory.
 
-This is based on https://github.com/corda/cordapp-template-kotlin.git
+This is based on [cordapp-template-kotlin](https://github.com/corda/cordapp-template-kotlin.git).
 
 ## Web server
 
 There's a useful (i.e. complete) example of a web server in the
-https://github.com/corda/samples-kotlin/tree/master/Basic/cordapp-example project.
+[example project](https://github.com/corda/samples-kotlin/tree/master/Basic/cordapp-example).
 
 ## Introduction
 
@@ -22,15 +22,11 @@ This includes configuring RPC users' credentials, and permissions to use specifi
 
 ## Jackson
 
-The `Server.kt` file in the `cordapp-example` project (i.e. [here](https://github.com/corda/samples-kotlin/blob/master/Basic/cordapp-example/clients/src/main/kotlin/com/example/server/Server.kt)) defines a
-`mappingJackson2HttpMessageConverter` function.
-The blog says,
+The `Server.kt` file in the `cordapp-example` project (i.e. [here](https://github.com/corda/samples-kotlin/blob/master/Basic/cordapp-example/clients/src/main/kotlin/com/example/server/Server.kt)) defines a `mappingJackson2HttpMessageConverter` function. The blog says,
 
-> Since Corda uses a Jackson object type mapping we need to define a Java Spring @Bean to
-bind the Corda Jackson object-mapper to the HTTP message types used by Spring.
+> Since Corda uses a Jackson object type mapping we need to define a Java Spring `@Bean` to bind the Corda Jackson object-mapper to the HTTP message types used by Spring.
 
-This function isn't present in the `spring-webserver` example nor in the
-`cordapp-template-kotlin` template.
+This function isn't present in the `spring-webserver` example nor in the `cordapp-template-kotlin` template.
 
 I believe it's for mapping some complex types, like "date" or "party" perhaps.
 
@@ -40,23 +36,27 @@ presumably because I don't use Corda-specific types in the RPC interfaces
 
 ## How to start it
 
-https://docs.corda.net/docs/corda-os/4.5/tutorial-cordapp.html explains how to start it:
+This [tutorial](https://docs.corda.net/docs/corda-os/4.5/tutorial-cordapp.html) explains how to start it:
 
 - To rebuild and restart the nodes:
 
-      ./gradlew build
-      ./gradlew deployNodes
-      ./build/nodes/runnodes
+  ```shell
+  $ ./gradlew build
+  $ ./gradlew deployNodes
+  $ ./build/nodes/runnodes
+  ```
 
 - To start the web server:
 
-      ./gradlew runPartiesServer
-  
+  ```shell
+  $ ./gradlew runPartiesServer
+  ```
   This also builds (doesn't just start) the web server.
   After running this there's eventually a message like ...
-  
-      [INFO ] 23:25:29.121 [main] TomcatEmbeddedServletContainer.start - Tomcat started on port(s): 50005 (http)
-      
+
+  ```
+  [INFO ] 23:25:29.121 [main] TomcatEmbeddedServletContainer.start - Tomcat started on port(s): 50005 (http)
+  ```    
   ... after which you can connect with a web browser e.g. to http://localhost:50005/
   
   In other projects, what I named the `runPartiesServer` task might be named `runPartyAServer` or `runTemplateServer`.
