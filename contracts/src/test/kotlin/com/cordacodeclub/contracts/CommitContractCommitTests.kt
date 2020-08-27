@@ -26,6 +26,21 @@ class CommitContractCommitTests {
     private val player = playerId.identity.party
 
     @Test
+    fun `CommitContract with a Commit needs a command`() {
+        ledgerServices.transaction {
+            val casinoId = UniqueIdentifier()
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
+                    Instant.now(), 1, casinoId))
+            output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino)))
+            command(player.owningKey, GameContract.Commands.Create(1))
+            failsWith("The CommitContract must find at least 1 command")
+
+            command(casino.owningKey, Commit(0))
+            verifies()
+        }
+    }
+
+    @Test
     fun `Commit command needs a Committed state output`() {
         ledgerServices.transaction {
             val casinoId = UniqueIdentifier()

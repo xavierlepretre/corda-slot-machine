@@ -35,7 +35,8 @@ class CommitContract : Contract {
         }
 
         val coveredStates = tx.commandsOfType<Commands>()
-                .flatMap() { command ->
+                .also { require (it.isNotEmpty()) { "The CommitContract must find at least 1 command" } }
+                .flatMap { command ->
                     when (command.value) {
                         is Commands.Commit ->
                             listOf(outputsKey to verifyCommit(tx, command.value as Commands.Commit, command.signers, outputIds).ref)
