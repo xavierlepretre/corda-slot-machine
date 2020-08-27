@@ -45,7 +45,7 @@ class CommitContract : Contract {
                                     .let { listOf(inputsKey to it.first.ref, outputsKey to it.second.ref) }
                         is Commands.Use ->
                             listOf(inputsKey to verifyUse(tx, command.value as Commands.Use, command.signers, inputIds).ref)
-                        is Commands.Resolve -> listOf(inputsKey to verifyClosure(tx, command.value as Commands.Use, command.signers, inputIds).ref)
+                        is Commands.Resolve -> listOf(inputsKey to verifyClosure(tx))
                     }
                 }
                 .toMultiMap()
@@ -143,13 +143,24 @@ class CommitContract : Contract {
         return tx.inRef(use.inputIndex)
     }
 
-    private fun verifyClosure(
-            tx: LedgerTransaction,
-            use: Commands.Use,
-            signers: List<PublicKey>,
-            inputIds: Map<UniqueIdentifier, List<LinearState>>
-    ): StateAndRef<RevealedState> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    private fun verifyClosure(tx: LedgerTransaction) {
+        requireThat {
+            val outputGameState = tx.outputsOfType<GameState>()
+            val inputGameState = tx.inputsOfType<GameState>()
+            val inputCommittedState = tx.outputsOfType<CommittedState>()
+            val outputCommittedState = tx.inputsOfType<CommittedState>()
+            val inputRevealedState = tx.outputsOfType<RevealedState>()
+            val outputRevealedState = tx.inputsOfType<RevealedState>()
+
+            "The output must be a GameState" using (outputGameState.size == 1)
+            "There must be no input GameState" using (inputGameState.isEmpty())
+
+            "The output must be a CommittedState" using (outputCommittedState.size == 1)
+            "There must be no input CommittedState" using (inputCommittedState.isEmpty())
+
+            "The output must be a RevealedState" using (outputRevealedState.size == 1)
+            "There must be no input RevealedState" using (inputRevealedState.isEmpty())
+        }
     }
 
     sealed class Commands : CommandData {
