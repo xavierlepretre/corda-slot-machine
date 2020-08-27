@@ -2,6 +2,7 @@ package com.cordacodeclub.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Use
+import com.cordacodeclub.contracts.GameContract.Commands.Resolve
 import com.cordacodeclub.states.GameState
 import com.cordacodeclub.states.RevealedState
 import net.corda.core.contracts.StateAndRef
@@ -33,10 +34,11 @@ object UseFlows {
                 throw FlowException("The casinoSession is not for the casino")
             val builder = TransactionBuilder(playerRef.state.notary)
                     .addInputState(playerRef)
-                    .addInputState(casinoRef)
-                    .addInputState(gameRef)
                     .addCommand(Use(0), player.owningKey)
+                    .addInputState(casinoRef)
                     .addCommand(Use(1), player.owningKey)
+                    .addInputState(gameRef)
+                    .addCommand(Resolve(2), player.owningKey)
             builder.verify(serviceHub)
             val signedTx = serviceHub.signInitialTransaction(builder, player.owningKey)
             return subFlow(FinalityFlow(signedTx, casinoSession))

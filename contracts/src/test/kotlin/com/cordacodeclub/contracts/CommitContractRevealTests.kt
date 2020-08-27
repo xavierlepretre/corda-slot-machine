@@ -41,9 +41,10 @@ class CommitContractRevealTests {
                 Instant.now().plusSeconds(30), 2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
                 Instant.now().plusSeconds(30), 2, playerId))
-        output(CommitContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
+        output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
         command(casino.owningKey, Commit(0))
         command(player.owningKey, Commit(1))
+        command(player.owningKey, GameContract.Commands.Create(2))
         verifies()
     }
 
@@ -275,10 +276,11 @@ class CommitContractRevealTests {
                     val playerId = UniqueIdentifier()
                     output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                             Instant.now(), 2, playerId))
-                    output(CommitContract.id, GameState(listOf(playerId), UniqueIdentifier(), listOf(player)))
+                    output(GameContract.id, GameState(listOf(playerId), UniqueIdentifier(), listOf(player)))
                     failsWith("All outputs states which belong to one party must have an associated command")
 
                     command(player.owningKey, Commit(1))
+                    command(player.owningKey, GameContract.Commands.Create(2))
                     verifies()
                 }
 
