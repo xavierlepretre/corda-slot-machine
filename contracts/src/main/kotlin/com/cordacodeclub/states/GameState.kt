@@ -18,4 +18,7 @@ data class GameState(
         val commitIds: List<UniqueIdentifier>,
         override val linearId: UniqueIdentifier,
         override val participants: List<AbstractParty>) : LinearState {
+    init {
+        require(participants.isNotEmpty()) { "There must be participants" }
+    }
 }
