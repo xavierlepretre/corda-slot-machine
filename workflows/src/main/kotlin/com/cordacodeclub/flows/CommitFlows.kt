@@ -76,6 +76,10 @@ object CommitFlows {
             val casinoHash: SecureHash,
             val casino: AbstractParty) : FlowLogic<SignedTransaction>() {
 
+        companion object {
+            const val minCommits = 2
+        }
+
         @Suspendable
         override fun call(): SignedTransaction {
             playerSession.send(casinoHash)
@@ -98,6 +102,8 @@ object CommitFlows {
                         throw FlowException("My commit state should be for casino")
                     if (myCommitState.hash != casinoHash)
                         throw FlowException("My commit state should have the hash I sent")
+                    if (stx.tx.outRefsOfType<CommittedState>().size < minCommits)
+                        throw FlowException("There should be at least $minCommits commits")
                     if (stx.tx.outputsOfType(CommittedState::class.java).any { it.revealDeadline != revealDeadline })
                         throw FlowException("One CommittedState does not have the correct reveal deadline")
                     if (stx.tx.timeWindow != TimeWindow.untilOnly(commitDeadline))
