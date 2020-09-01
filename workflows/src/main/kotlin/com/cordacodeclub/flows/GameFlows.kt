@@ -7,6 +7,8 @@ import com.cordacodeclub.states.GameState
 import com.cordacodeclub.states.RevealedState
 import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
 import com.r3.corda.lib.accounts.workflows.services.AccountService
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlow
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlowHandler
 import net.corda.core.flows.*
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.AnonymousParty
@@ -49,7 +51,7 @@ object GameFlows {
             val playerAccount = accountService
                     .accountInfo(playerName)
                     .let {
-                        if (it.size == 0)
+                        if (it.isEmpty())
                             throw FlowException("No player with this name $playerName")
                         else if (1 < it.size)
                             throw FlowException("More than 1 player found with this name $playerName")
@@ -61,7 +63,7 @@ object GameFlows {
             val player = serviceHub.identityService.publicKeysForExternalId(playerAccount.identifier.id)
                     .toList()
                     .let {
-                        if (1 <= it.size) AnonymousParty(it.first())
+                        if (it.isNotEmpty()) AnonymousParty(it.first())
                         else serviceHub.createKeyForAccount(playerAccount)
                     }
             subFlow(Initiator(player, casino))
@@ -85,6 +87,8 @@ object GameFlows {
                     ?: throw FlowException("Cannot resolve the casino host")
             if (casinoHost == ourIdentity) throw FlowException("You must play with a remote host, not yourself")
             val casinoSession = initiateFlow(casinoHost)
+            // Inform casino of player
+            subFlow(SyncKeyMappingFlow(casinoSession, listOf(player)))
             // Inform casino of new game
             val setup = GameSetup(player, casino, commitDeadline, revealDeadline)
             casinoSession.send(setup)
@@ -108,7 +112,7 @@ object GameFlows {
             val useTx = subFlow(UseFlows.Initiator(
                     playerRevealedRef, casinoRevealed, gameRef, casinoSession))
 
-            TODO("Return the outcome for the RPC")
+            //TODO("Return the outcome for the RPC")
         }
     }
 
@@ -118,6 +122,8 @@ object GameFlows {
         @Suspendable
         override fun call() {
             val casinoImage = CommitImage.createRandom(Random())
+            // Receive player information
+            subFlow(SyncKeyMappingFlowHandler(playerSession))
             // Receive new game information
             val (player, casino, commitDeadline, revealDeadline) =
                     playerSession.receive<GameSetup>().unwrap { it }

@@ -52,7 +52,7 @@ object RevealFlows {
                             RevealedState(image, committed.creator, committedRef.getGamePointer(),
                                     committed.linearId, revealParticipants),
                             CommitContract.id)
-                    .addCommand(Reveal(0, 0))
+                    .addCommand(Reveal(0, 0), committed.creator.owningKey)
                     .addReferenceState(ReferencedStateAndRef(gameRef))
                     .setTimeWindow(TimeWindow.untilOnly(revealDeadline))
             builder.verify(serviceHub)

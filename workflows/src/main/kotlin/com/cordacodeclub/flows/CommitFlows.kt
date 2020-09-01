@@ -48,8 +48,8 @@ object CommitFlows {
             val casinoCommitId = UniqueIdentifier()
             val builder = TransactionBuilder(notary)
                     .addOutputState(CommittedState(playerHash, player, revealDeadline, 2,
-                            playerCommitId, listOf(player, casino)))
                     .addCommand(Command(Commit(0), player.owningKey))
+                            playerCommitId, listOf(player)))
                     .addOutputState(CommittedState(casinoHash, casino, revealDeadline, 2,
                             casinoCommitId, listOf(player, casino)))
                     .addCommand(Command(Commit(1), casino.owningKey))
@@ -82,6 +82,9 @@ object CommitFlows {
 
         @Suspendable
         override fun call(): SignedTransaction {
+            if (playerSession.counterparty != serviceHub.identityService.wellKnownPartyFromAnonymous(setup.player)
+                    ?: throw FlowException("Cannot resolve the player host"))
+                throw FlowException("The playerSession is not for the player")
             playerSession.send(casinoHash)
             val fullySignedTx = subFlow(object : SignTransactionFlow(playerSession) {
 
