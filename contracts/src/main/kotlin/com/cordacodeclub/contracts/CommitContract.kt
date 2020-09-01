@@ -13,8 +13,8 @@ class CommitContract : Contract {
 
     companion object {
         val id = CommitContract::class.java.canonicalName
-        val inputsKey = 1
-        val outputsKey = 2
+        const val inputsKey = 1
+        const val outputsKey = 2
     }
 
     override fun verify(tx: LedgerTransaction) {
@@ -35,7 +35,8 @@ class CommitContract : Contract {
         }
 
         val coveredStates = tx.commandsOfType<Commands>()
-                .flatMap() { command ->
+                .also { require (it.isNotEmpty()) { "The CommitContract must find at least 1 command" } }
+                .flatMap { command ->
                     when (command.value) {
                         is Commands.Commit ->
                             listOf(outputsKey to verifyCommit(tx, command.value as Commands.Commit, command.signers, outputIds).ref)

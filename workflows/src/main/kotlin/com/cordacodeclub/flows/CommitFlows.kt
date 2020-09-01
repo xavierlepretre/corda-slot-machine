@@ -2,8 +2,12 @@ package com.cordacodeclub.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Commit
+import com.cordacodeclub.contracts.GameContract
+import com.cordacodeclub.contracts.GameContract.Commands.Create
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.GameState
+import com.cordacodeclub.states.LockableTokenType
+import net.corda.core.contracts.Amount
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.UniqueIdentifier
@@ -48,9 +52,10 @@ object CommitFlows {
                     .addCommand(Command(Commit(0), player.owningKey))
                     .addOutputState(CommittedState(casinoHash, casino, revealDeadline, 2,
                             casinoCommitId, listOf(player, casino)))
+                    .addCommand(Command(Commit(1), casino.owningKey))
                     .addOutputState(GameState(listOf(playerCommitId, casinoCommitId),
                             UniqueIdentifier(), listOf(player, casino)))
-                    .addCommand(Command(Commit(1), casino.owningKey))
+                    .addCommand(Create(2), player.owningKey)
                     .setTimeWindow(TimeWindow.untilOnly(commitDeadline))
             builder.verify(serviceHub)
             val partiallySignedTx = serviceHub.signInitialTransaction(builder, player.owningKey)
@@ -70,6 +75,10 @@ object CommitFlows {
             val revealDeadline: Instant,
             val casinoHash: SecureHash,
             val casino: AbstractParty) : FlowLogic<SignedTransaction>() {
+
+        companion object {
+            const val minCommits = 2
+        }
 
         @Suspendable
         override fun call(): SignedTransaction {
@@ -93,6 +102,8 @@ object CommitFlows {
                         throw FlowException("My commit state should be for casino")
                     if (myCommitState.hash != casinoHash)
                         throw FlowException("My commit state should have the hash I sent")
+                    if (stx.tx.outRefsOfType<CommittedState>().size < minCommits)
+                        throw FlowException("There should be at least $minCommits commits")
                     if (stx.tx.outputsOfType(CommittedState::class.java).any { it.revealDeadline != revealDeadline })
                         throw FlowException("One CommittedState does not have the correct reveal deadline")
                     if (stx.tx.timeWindow != TimeWindow.untilOnly(commitDeadline))

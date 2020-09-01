@@ -26,12 +26,28 @@ class CommitContractCommitTests {
     private val player = playerId.identity.party
 
     @Test
+    fun `CommitContract with a Commit needs a command`() {
+        ledgerServices.transaction {
+            val casinoId = UniqueIdentifier()
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
+                    Instant.now(), 1, casinoId))
+            output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino)))
+            command(player.owningKey, GameContract.Commands.Create(1))
+            failsWith("The CommitContract must find at least 1 command")
+
+            command(casino.owningKey, Commit(0))
+            verifies()
+        }
+    }
+
+    @Test
     fun `Commit command needs a Committed state output`() {
         ledgerServices.transaction {
             val casinoId = UniqueIdentifier()
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     Instant.now(), 1, casinoId))
-            output(CommitContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino)))
+            output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino)))
+            command(casino.owningKey, GameContract.Commands.Create(1))
 
             tweak {
                 command(casino.owningKey, Commit(1))
@@ -49,7 +65,8 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     Instant.now(), 1, casinoId))
-            output(CommitContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino)))
+            output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino)))
+            command(casino.owningKey, GameContract.Commands.Create(1))
 
             tweak {
                 command(player.owningKey, Commit(0))
@@ -70,23 +87,26 @@ class CommitContractCommitTests {
     fun `Commit needs the Committed state with a correct game index`() {
         ledgerServices.transaction {
             val casinoId = UniqueIdentifier()
-            output(CommitContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
-            command(casino.owningKey, Commit(1))
+            command(casino.owningKey, Commit(0))
+            command(casino.owningKey, GameContract.Commands.Create(1))
 
             tweak {
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                         Instant.now(), -1, casinoId))
+                output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game output index must be possible")
             }
 
             tweak {
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                         Instant.now(), 2, casinoId))
+                output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game output index must be possible")
             }
 
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    Instant.now(), 0, casinoId))
+                    Instant.now(), 1, casinoId))
+            output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
             verifies()
         }
     }
@@ -95,17 +115,19 @@ class CommitContractCommitTests {
     fun `Commit needs the Game state at the right index`() {
         ledgerServices.transaction {
             val casinoId = UniqueIdentifier()
-            output(CommitContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
-            command(casino.owningKey, Commit(1))
+            command(casino.owningKey, Commit(0))
+            command(casino.owningKey, GameContract.Commands.Create(1))
 
             tweak {
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                        Instant.now(), 1, casinoId))
+                        Instant.now(), 0, casinoId))
+                output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game output must be at the right index")
             }
 
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    Instant.now(), 0, casinoId))
+                    Instant.now(), 1, casinoId))
+            output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
             verifies()
         }
     }
@@ -114,7 +136,8 @@ class CommitContractCommitTests {
     fun `Commit cannot accept duplicate ids in outputs`() {
         ledgerServices.transaction {
             val casinoId = UniqueIdentifier()
-            output(CommitContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
+            output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
+            command(casino.owningKey, GameContract.Commands.Create(0))
             command(casino.owningKey, Commit(1))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     Instant.now(), 0, casinoId))
@@ -134,11 +157,12 @@ class CommitContractCommitTests {
         ledgerServices.transaction {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
-            output(CommitContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
+            output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     Instant.now(), 0, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     Instant.now(), 0, playerId))
+            command(casino.owningKey, GameContract.Commands.Create(0))
             command(casino.owningKey, Commit(1))
             failsWith("All outputs states which belong to one party must have an associated command")
 
@@ -154,13 +178,14 @@ class CommitContractCommitTests {
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     Instant.now(), 1, casinoId))
             command(casino.owningKey, Commit(0))
+            command(casino.owningKey, GameContract.Commands.Create(1))
 
             tweak {
-                output(CommitContract.id, GameState(listOf(UniqueIdentifier()), UniqueIdentifier(), listOf(casino, player)))
+                output(GameContract.id, GameState(listOf(UniqueIdentifier()), UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game commit ids must all loop back")
             }
 
-            output(CommitContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
+            output(GameContract.id, GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino, player)))
             verifies()
 
         }
@@ -175,9 +200,10 @@ class CommitContractCommitTests {
                     Instant.now(), 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     Instant.now(), 2, playerId))
-            output(CommitContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
+            output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
             command(casino.owningKey, Commit(0))
             command(player.owningKey, Commit(1))
+            command(casino.owningKey, GameContract.Commands.Create(2))
             verifies()
         }
     }

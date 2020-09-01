@@ -37,9 +37,10 @@ class CommitContractUseTests {
                 Instant.now().plusSeconds(30), 2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
                 Instant.now().plusSeconds(30), 2, playerId))
-        output(CommitContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
+        output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
         command(casino.owningKey, Commit(0))
         command(player.owningKey, Commit(1))
+        command(player.owningKey, GameContract.Commands.Create(2))
         verifies()
     }
 
@@ -69,6 +70,7 @@ class CommitContractUseTests {
                 input(playerRevealRef.ref)
                 input(casinoRef.getGamePointer().pointer)
                 command(player.owningKey, Use(1))
+                command(player.owningKey, GameContract.Commands.Resolve(2))
 
                 tweak {
                     command(casino.owningKey, Use(2))
@@ -86,8 +88,8 @@ class CommitContractUseTests {
         val casinoImage = CommitImage.createRandom(random)
         val playerImage = CommitImage.createRandom(random)
         ledgerServices.ledger {
-            val (casinoRef, playerRef) = issueTwoCommits(
-                    casinoImage.hash, playerImage.hash).outRefsOfType<CommittedState>()
+            val (casinoRef, playerRef) = issueTwoCommits(casinoImage.hash, playerImage.hash)
+                    .outRefsOfType<CommittedState>()
             val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
             transaction {
@@ -95,6 +97,7 @@ class CommitContractUseTests {
                 input(playerRevealRef.ref)
                 command(casino.owningKey, Use(0))
                 command(player.owningKey, Use(1))
+                command(player.owningKey, GameContract.Commands.Resolve(2))
 
                 failsWith("The game must be in input")
 
@@ -114,9 +117,10 @@ class CommitContractUseTests {
             val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
             transaction {
-                input(casinoRef.getGamePointer().pointer)
                 input(casinoRevealRef.ref)
-                command(casino.owningKey, Use(1))
+                input(casinoRef.getGamePointer().pointer)
+                command(casino.owningKey, Use(0))
+                command(player.owningKey, GameContract.Commands.Resolve(1))
 
                 failsWith("All the game commit ids must be present")
 
@@ -142,6 +146,7 @@ class CommitContractUseTests {
                 input(casinoRef1.getGamePointer().pointer)
                 input(casinoRevealRef1.ref)
                 input(playerRevealRef1.ref)
+                command(player.owningKey, GameContract.Commands.Resolve(0))
                 command(casino.owningKey, Use(1))
                 command(player.owningKey, Use(2))
                 verifies()
@@ -151,10 +156,11 @@ class CommitContractUseTests {
                     val playerId = UniqueIdentifier()
                     output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                             Instant.now(), 1, playerId))
-                    output(CommitContract.id, GameState(listOf(playerId), UniqueIdentifier(), listOf(player)))
+                    output(GameContract.id, GameState(listOf(playerId), UniqueIdentifier(), listOf(player)))
                     failsWith("All outputs states which belong to one party must have an associated command")
 
                     command(player.owningKey, Commit(0))
+                    command(player.owningKey, GameContract.Commands.Create(1))
                     verifies()
                 }
 
@@ -199,6 +205,7 @@ class CommitContractUseTests {
                 input(casinoRef.getGamePointer().pointer)
                 input(casinoRevealRef.ref)
                 input(playerRevealRef.ref)
+                command(player.owningKey, GameContract.Commands.Resolve(0))
                 command(casino.owningKey, Use(1))
 
                 tweak {
