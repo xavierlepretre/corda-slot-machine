@@ -2,6 +2,7 @@ package com.cordacodeclub.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract
+import com.cordacodeclub.contracts.GameContract
 import com.cordacodeclub.states.GameState
 import com.cordacodeclub.states.RevealedState
 import net.corda.core.contracts.StateAndRef
@@ -26,12 +27,12 @@ object ForeClosureFlow {
             val associatedRevealStates = serviceHub.vaultService.queryBy<RevealedState>().states
                     .filter { it.state.data.game.pointer == gameRef.ref }
             val builder = TransactionBuilder(notary)
-                    .addOutputState(gameRef.state)
-                    .addCommand(CommitContract.Commands.Resolve)
+                    .addInputState(gameRef)
+                    .addCommand(GameContract.Commands.Resolve(0))
 
             associatedRevealStates.map {
-                builder.addOutputState(it.state)
-                        .addCommand(CommitContract.Commands.Resolve)
+                builder.addInputState(it)
+                        .addCommand(CommitContract.Commands.Close)
             }
 
             builder.verify(serviceHub)

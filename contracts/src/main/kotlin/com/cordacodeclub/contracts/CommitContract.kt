@@ -45,7 +45,7 @@ class CommitContract : Contract {
                                     .let { listOf(inputsKey to it.first.ref, outputsKey to it.second.ref) }
                         is Commands.Use ->
                             listOf(inputsKey to verifyUse(tx, command.value as Commands.Use, command.signers, inputIds).ref)
-                        is Commands.Resolve -> listOf(inputsKey to verifyClosure(tx))
+                        is Commands.Close -> listOf(inputsKey to verifyClosure(tx))
                     }
                 }
                 .toMultiMap()
@@ -151,10 +151,10 @@ class CommitContract : Contract {
             val outputRevealedState = tx.inputsOfType<RevealedState>()
 
             "The input must be a GameState" using (inputGameState.size == 1)
-            "The output must be a GameState" using (outputGameState.size == 1)
+            "There must not be any output GameStates" using (outputGameState.isEmpty())
 
-            "The input must be a RevealedState" using (inputRevealedState.isEmpty())
-            "The output must be a RevealedState" using (outputRevealedState.isNotEmpty())
+            "The input must be a RevealedState" using (inputRevealedState.isNotEmpty())
+            "There must not be any RevealedStates" using (outputRevealedState.isEmpty())
 
             inputRevealedState.map {
                 "The RevealState input must refer to the same GameState" using tx.inputs
@@ -168,7 +168,7 @@ class CommitContract : Contract {
         class Commit(val outputIndex: Int) : Commands()
         class Reveal(val inputIndex: Int, val outputIndex: Int) : Commands()
         class Use(val inputIndex: Int) : Commands()
-        object Resolve : Commands()
+        object Close : Commands()
     }
 
 }
