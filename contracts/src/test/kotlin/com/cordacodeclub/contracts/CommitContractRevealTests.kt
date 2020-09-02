@@ -27,6 +27,8 @@ class CommitContractRevealTests {
             cordappPackages = listOf("com.cordacodeclub.contracts", "net.corda.testing.contracts"),
             firstIdentity = notaryId,
             networkParameters = testNetworkParameters().copy(minimumPlatformVersion = 4))
+    private val issuerId = TestIdentity(CordaX500Name("Issuer", "Ansterdam", "NL"))
+    private val issuer = issuerId.identity.party
     private val casinoId = TestIdentity(CordaX500Name("Casino", "London", "GB"))
     private val casino = casinoId.identity.party
     private val playerId = TestIdentity(CordaX500Name("Player", "Paris", "FR"))
@@ -37,14 +39,15 @@ class CommitContractRevealTests {
             casinoHash: SecureHash, playerHash: SecureHash) = transaction {
         val casinoId = UniqueIdentifier()
         val playerId = UniqueIdentifier()
-        output(CommitContract.id, CommittedState(casinoHash, casino,
-                Instant.now().plusSeconds(30), 2, casinoId))
-        output(CommitContract.id, CommittedState(playerHash, player,
-                Instant.now().plusSeconds(30), 2, playerId))
-        output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
+        val revealDeadline =Instant.now().plusSeconds(30)
+        output(CommitContract.id, CommittedState(casinoHash, casino, revealDeadline, 2, casinoId))
+        output(CommitContract.id, CommittedState(playerHash, player, revealDeadline, 2, playerId))
+        output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                player commitsTo playerId with(1L issuedBy issuer),
+                UniqueIdentifier(), listOf(casino, player)))
         command(casino.owningKey, Commit(0))
         command(player.owningKey, Commit(1))
-        command(player.owningKey, GameContract.Commands.Create(2))
+        command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(2))
         verifies()
     }
 
@@ -271,18 +274,6 @@ class CommitContractRevealTests {
                 reference(casinoRef.getGamePointer().pointer)
                 timeWindow(TimeWindow.untilOnly(casinoRef.state.data.revealDeadline))
                 verifies()
-
-                tweak {
-                    val playerId = UniqueIdentifier()
-                    output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                            Instant.now(), 2, playerId))
-                    output(GameContract.id, GameState(listOf(playerId), UniqueIdentifier(), listOf(player)))
-                    failsWith("All outputs states which belong to one party must have an associated command")
-
-                    command(player.owningKey, Commit(1))
-                    command(player.owningKey, GameContract.Commands.Create(2))
-                    verifies()
-                }
 
                 tweak {
                     input(playerRef.ref)

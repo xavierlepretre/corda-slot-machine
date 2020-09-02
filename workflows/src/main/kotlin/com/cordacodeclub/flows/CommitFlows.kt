@@ -2,24 +2,20 @@ package com.cordacodeclub.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Commit
-import com.cordacodeclub.contracts.GameContract
 import com.cordacodeclub.contracts.GameContract.Commands.Create
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.GameState
-import com.cordacodeclub.states.LockableTokenType
-import net.corda.core.contracts.Amount
 import net.corda.core.contracts.Command
+import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.crypto.SecureHash
 import net.corda.core.flows.*
-import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.node.StatesToRecord
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.unwrap
-import java.time.Instant
 
 /**
  * Flows to create states with the hashes to which the game participants commit.
@@ -39,7 +35,8 @@ object CommitFlows {
 
         @Suspendable
         override fun call(): SignedTransaction {
-            val (player, casino, commitDeadline, revealDeadline) = setup
+            val (_, _, _, casino,
+                    commitDeadline, revealDeadline) = setup
             if (casinoSession.counterparty != serviceHub.identityService.wellKnownPartyFromAnonymous(casino)
                     ?: throw FlowException("Cannot resolve the casino host"))
                 throw FlowException("The casinoSession is not for the casino")
@@ -47,20 +44,21 @@ object CommitFlows {
             val playerCommitId = UniqueIdentifier()
             val casinoCommitId = UniqueIdentifier()
             val builder = TransactionBuilder(notary)
-                    .addOutputState(CommittedState(playerHash, player, revealDeadline, 2,
-                    .addCommand(Command(Commit(0), player.owningKey))
-                            playerCommitId, listOf(player)))
+                    .addOutputState(CommittedState(playerHash, setup.player, revealDeadline, 2,
+                            playerCommitId, listOf(setup.player)))
+                    .addCommand(Command(Commit(0), setup.player.owningKey))
                     .addOutputState(CommittedState(casinoHash, casino, revealDeadline, 2,
-                            casinoCommitId, listOf(player, casino)))
+                            casinoCommitId, listOf(setup.player, casino)))
                     .addCommand(Command(Commit(1), casino.owningKey))
-                    .addOutputState(GameState(listOf(playerCommitId, casinoCommitId),
-                            UniqueIdentifier(), listOf(player, casino)))
-                    .addCommand(Create(2), player.owningKey)
+                    .addOutputState(GameState(setup.casinoCommittedBettor(casinoCommitId),
+                            setup.playerCommittedBettor(playerCommitId),
+                            UniqueIdentifier(), listOf(setup.player, casino)))
+                    .addCommand(Create(2), listOf(setup.casino.owningKey, setup.player.owningKey))
                     .setTimeWindow(TimeWindow.untilOnly(commitDeadline))
             builder.verify(serviceHub)
-            val partiallySignedTx = serviceHub.signInitialTransaction(builder, player.owningKey)
+            val partiallySignedTx = serviceHub.signInitialTransaction(builder, setup.player.owningKey)
             val fullySignedTx = subFlow(CollectSignaturesFlow(
-                    partiallySignedTx, listOf(casinoSession), listOf(player.owningKey)))
+                    partiallySignedTx, listOf(casinoSession), listOf(setup.player.owningKey)))
             return subFlow(FinalityFlow(fullySignedTx, casinoSession))
         }
     }
@@ -71,10 +69,8 @@ object CommitFlows {
      */
     class Responder(
             val playerSession: FlowSession,
-            val commitDeadline: Instant,
-            val revealDeadline: Instant,
-            val casinoHash: SecureHash,
-            val casino: AbstractParty) : FlowLogic<SignedTransaction>() {
+            val setup: GameFlows.GameSetup,
+            val casinoHash: SecureHash) : FlowLogic<SignedTransaction>() {
 
         companion object {
             const val minCommits = 2
@@ -89,28 +85,53 @@ object CommitFlows {
             val fullySignedTx = subFlow(object : SignTransactionFlow(playerSession) {
 
                 override fun checkTransaction(stx: SignedTransaction) {
-                    // Only 1 command with a local key, i.e. to sign by me.
+                    // Only 2 commands with a local key, i.e. to sign by me.
                     val myCommands = stx.tx.commands.filter {
                         it.signers.any(serviceHub::isLocalKey)
                     }
-                    if (myCommands.size != 1)
-                        throw FlowException("I should have only 1 command to sign")
-                    val myCommand = myCommands.single().value
-                    if (myCommand !is Commit)
-                        throw FlowException("I should only sign a Commit command")
+                    if (myCommands.size != 2)
+                        throw FlowException("I should have only 2 commands to sign")
+
+                    val myCommitCommand = myCommands
+                            .mapNotNull { it.value as? Commit }
+                            .singleOrNull()
+                            ?: throw FlowException("I should have only 1 Commit command to sign")
                     val myCommitState = stx.tx
-                            .outRef<CommittedState>(myCommand.outputIndex)
+                            .outRef<CommittedState>(myCommitCommand.outputIndex)
                             .state.data
-                    if (myCommitState.creator != casino)
+                    if (myCommitState.creator != setup.casino)
                         throw FlowException("My commit state should be for casino")
                     if (myCommitState.hash != casinoHash)
                         throw FlowException("My commit state should have the hash I sent")
                     if (stx.tx.outRefsOfType<CommittedState>().size < minCommits)
                         throw FlowException("There should be at least $minCommits commits")
-                    if (stx.tx.outputsOfType(CommittedState::class.java).any { it.revealDeadline != revealDeadline })
+                    if (stx.tx.outputsOfType(CommittedState::class.java).any { it.revealDeadline != setup.revealDeadline })
                         throw FlowException("One CommittedState does not have the correct reveal deadline")
-                    if (stx.tx.timeWindow != TimeWindow.untilOnly(commitDeadline))
+                    if (stx.tx.timeWindow != TimeWindow.untilOnly(setup.commitDeadline))
                         throw FlowException("The time-window is incorrect")
+
+                    val myCreateCommand = myCommands
+                            .mapNotNull { it.value as? Create }
+                            .singleOrNull()
+                            ?: throw FlowException("I should have only 1 Create command to sign")
+                    if (stx.tx.outRef<ContractState>(myCreateCommand.outputIndex).state.data !is GameState)
+                        throw FlowException("The create output index should have a GameState")
+                    val gameStates = stx.tx.outputsOfType<GameState>()
+                    if (gameStates.size != 1)
+                        throw FlowException("There should be exactly 1 GameState, not ${gameStates.size}")
+                    val gameState = gameStates.single()
+                    if (gameState.player.committer.holder != setup.player)
+                        throw FlowException("The game player should be the expected player")
+                    if (gameState.player.issuedAmount.issuer != setup.issuer)
+                        throw FlowException("The game player issuer should be the expected issuer")
+                    if (gameState.casino.committer.holder != setup.casino)
+                        throw FlowException("The game casino should be the expected casino")
+                    if (gameState.casino.issuedAmount.issuer != setup.issuer)
+                        throw FlowException("The game casino issuer should be the expected issuer")
+                    if (gameState.casino.issuedAmount.amount.quantity !=
+                            Math.multiplyExact(gameState.player.issuedAmount.amount.quantity, GameParameters.casinoToPlayerRatio))
+                        throw FlowException("The casino amount should be the expected ratio with the player amount")
+
                     // TODO Adds checks on the other commit state, as per the game state?
                 }
             })

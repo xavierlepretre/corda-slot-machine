@@ -59,7 +59,8 @@ class GameContract : Contract {
                              outputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>): StateAndRef<GameState> {
         "The output must be a GameState" using (tx.outputStates[create.outputIndex] is GameState)
         val gameState = tx.outputStates[create.outputIndex] as GameState
-        val associatedCommits = gameState.commitIds.map { outputIds[it] }
+        val associatedCommits = listOf(gameState.casino, gameState.player)
+                .map { outputIds[it.committer.linearId] }
         "The commit ids must all be associated CommittedStates" using associatedCommits.all { pair ->
             pair?.let { (commitIndex, linearState) ->
                 linearState is CommittedState
@@ -71,6 +72,14 @@ class GameContract : Contract {
                 .mapNotNull { (it?.second as? CommittedState)?.revealDeadline }
                 .distinct()
                 .size == 1)
+        "The game bettors must all have commits" using (associatedCommits
+                .mapNotNull { (it?.second as? CommittedState)?.creator }
+                .distinct()
+                .size == 2)
+        "The game bettors must be signers" using listOf(gameState.casino, gameState.player)
+                .map { it.committer.holder.owningKey }
+                .toSet()
+                .equals(signers.toSet())
         return tx.outRef(create.outputIndex)
     }
 
@@ -79,13 +88,15 @@ class GameContract : Contract {
         val gameRef = tx.inputs[resolve.inputIndex]
         "The input must be a GameState" using (gameRef.state.data is GameState)
         val gameState = gameRef.state.data as GameState
-        "The commit ids must all be associated RevealedStates" using gameState.commitIds.all { revealId ->
-            inputIds[revealId]?.let { (revealIndex, linearState) ->
-                linearState is RevealedState
-                        && linearState.game.pointer == gameRef.ref
-                        && tx.inRef<RevealedState>(revealIndex).state.contract == CommitContract.id
-            } ?: false
-        }
+        "The commit ids must all be associated RevealedStates" using listOf(gameState.casino, gameState.player)
+                .map { it.committer.linearId }
+                .all { revealId ->
+                    inputIds[revealId]?.let { (revealIndex, linearState) ->
+                        linearState is RevealedState
+                                && linearState.game.pointer == gameRef.ref
+                                && tx.inRef<RevealedState>(revealIndex).state.contract == CommitContract.id
+                    } ?: false
+                }
         return tx.inRef(resolve.inputIndex)
     }
 

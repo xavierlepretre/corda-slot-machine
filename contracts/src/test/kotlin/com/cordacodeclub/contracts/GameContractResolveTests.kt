@@ -28,6 +28,8 @@ class GameContractResolveTests {
             cordappPackages = listOf("com.cordacodeclub.contracts", "net.corda.testing.contracts"),
             firstIdentity = notaryId,
             networkParameters = testNetworkParameters().copy(minimumPlatformVersion = 4))
+    private val issuerId = TestIdentity(CordaX500Name("Issuer", "Ansterdam", "NL"))
+    private val issuer = issuerId.identity.party
     private val casinoId = TestIdentity(CordaX500Name("Casino", "London", "GB"))
     private val casino = casinoId.identity.party
     private val playerId = TestIdentity(CordaX500Name("Player", "Paris", "FR"))
@@ -38,14 +40,17 @@ class GameContractResolveTests {
             casinoHash: SecureHash, playerHash: SecureHash) = transaction {
         val casinoId = UniqueIdentifier()
         val playerId = UniqueIdentifier()
+        val revealDeadline = Instant.now().plusSeconds(60)
         output(CommitContract.id, CommittedState(casinoHash, casino,
-                Instant.now().plusSeconds(30), 2, casinoId))
+                revealDeadline, 2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
-                Instant.now().plusSeconds(30), 2, playerId))
-        output(GameContract.id, GameState(listOf(casinoId, playerId), UniqueIdentifier(), listOf(casino, player)))
+                revealDeadline, 2, playerId))
+        output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                player commitsTo playerId with (1L issuedBy issuer),
+                UniqueIdentifier(), listOf(casino, player)))
         command(casino.owningKey, Commit(0))
         command(player.owningKey, Commit(1))
-        command(player.owningKey, Create(2))
+        command(listOf(casino.owningKey, player.owningKey), Create(2))
         verifies()
     }
 
@@ -105,8 +110,12 @@ class GameContractResolveTests {
                 command(player.owningKey, Use(2))
 
                 tweak {
-                    input(GameContract.id, gameRef.state.data.copy(commitIds = listOf(
-                            casinoRef.state.data.linearId, UniqueIdentifier())))
+                    input(GameContract.id, gameRef.state.data.let { state ->
+                        state.copy(casino = state.casino
+                                .let { bettor ->
+                                    bettor.copy(committer = bettor.committer.copy(linearId = UniqueIdentifier()))
+                                })
+                    })
                     input(casinoRevealRef.ref)
                     input(playerRevealRef.ref)
                     failsWith("The commit ids must all be associated RevealedStates")

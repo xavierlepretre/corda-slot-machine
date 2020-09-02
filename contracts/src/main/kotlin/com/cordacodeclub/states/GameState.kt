@@ -15,10 +15,14 @@ import net.corda.core.identity.AbstractParty
  */
 @BelongsToContract(GameContract::class)
 data class GameState(
-        val commitIds: List<UniqueIdentifier>,
+        val casino: CommittedBettor,
+        val player: CommittedBettor,
         override val linearId: UniqueIdentifier,
         override val participants: List<AbstractParty>) : LinearState {
+
     init {
         require(participants.isNotEmpty()) { "There must be participants" }
+        require(casino.issuedAmount.issuer == player.issuedAmount.issuer) { "The issuers must be the same" }
+        require(casino.committer.holder != player.committer.holder) { "The holders must be different" }
     }
 }
