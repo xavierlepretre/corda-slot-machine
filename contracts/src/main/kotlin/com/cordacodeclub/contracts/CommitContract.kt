@@ -147,19 +147,20 @@ class CommitContract : Contract {
         requireThat {
             val outputGameState = tx.outputsOfType<GameState>()
             val inputGameState = tx.inputsOfType<GameState>()
-            val inputCommittedState = tx.outputsOfType<CommittedState>()
-            val outputCommittedState = tx.inputsOfType<CommittedState>()
             val inputRevealedState = tx.outputsOfType<RevealedState>()
             val outputRevealedState = tx.inputsOfType<RevealedState>()
 
+            "The input must be a GameState" using (inputGameState.size == 1)
             "The output must be a GameState" using (outputGameState.size == 1)
-            "There must be no input GameState" using (inputGameState.isEmpty())
 
-            "The output must be a CommittedState" using (outputCommittedState.size == 1)
-            "There must be no input CommittedState" using (inputCommittedState.isEmpty())
+            "The input must be a RevealedState" using (inputRevealedState.isEmpty())
+            "The output must be a RevealedState" using (outputRevealedState.isNotEmpty())
 
-            "The output must be a RevealedState" using (outputRevealedState.size == 1)
-            "There must be no input RevealedState" using (inputRevealedState.isEmpty())
+            inputRevealedState.map {
+                "The RevealState input must refer to the same GameState" using tx.inputs
+                        .map { it.ref }
+                        .contains(it.game.pointer)
+            }
         }
     }
 
@@ -167,7 +168,7 @@ class CommitContract : Contract {
         class Commit(val outputIndex: Int) : Commands()
         class Reveal(val inputIndex: Int, val outputIndex: Int) : Commands()
         class Use(val inputIndex: Int) : Commands()
-        class Resolve : Commands()
+        object Resolve : Commands()
     }
 
 }
