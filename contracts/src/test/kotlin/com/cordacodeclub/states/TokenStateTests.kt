@@ -16,8 +16,8 @@ class TokenStateTests {
     fun `can create tokens`() {
         val unlocked = LockableTokenState(holder, issuer, Amount(10, LockableTokenType))
         assertEquals(listOf(holder), unlocked.participants)
-        val locked = LockableTokenState(issuer, Amount(11, LockableTokenType))
-        assertEquals(listOf(issuer), locked.participants)
+        val locked = LockableTokenState(issuer, Amount(11, LockableTokenType), listOf(holder))
+        assertEquals(listOf(holder), locked.participants)
     }
 
 }

@@ -19,11 +19,11 @@ class GameStateTests {
     fun `GameState must have at least 1 participant`() {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (10L issuedBy issuer),
-                    bob commitsTo UniqueIdentifier() with(1L issuedBy issuer),
+                    bob commitsTo UniqueIdentifier() with(1L issuedBy issuer), 0,
                     UniqueIdentifier(), listOf())
         }
         GameState(alice commitsTo UniqueIdentifier() with (10L issuedBy issuer),
-                bob commitsTo UniqueIdentifier() with(1L issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with(1L issuedBy issuer), 0,
                 UniqueIdentifier(), listOf(alice))
     }
 
@@ -31,11 +31,11 @@ class GameStateTests {
     fun `GameState must has same issuer in bettors`() {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (10L issuedBy alice),
-            bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+            bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 1,
             UniqueIdentifier(), listOf(alice, bob))
         }
         GameState(alice commitsTo UniqueIdentifier() with (10L issuedBy issuer),
-                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 1,
                 UniqueIdentifier(), listOf(alice, bob))
     }
 
@@ -43,11 +43,23 @@ class GameStateTests {
     fun `GameState must have different holders in bettors`() {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (10L issuedBy issuer),
-                    alice commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    alice commitsTo UniqueIdentifier() with (1L issuedBy issuer), 2,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         GameState(alice commitsTo UniqueIdentifier() with (10L issuedBy issuer),
-                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 2,
+                UniqueIdentifier(), listOf(alice, bob))
+    }
+
+    @Test
+    fun `GameState locked wagers output index must be positive`() {
+        assertFailsWith<IllegalArgumentException> {
+            GameState(alice commitsTo UniqueIdentifier() with (10L issuedBy issuer),
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), -1,
+                    UniqueIdentifier(), listOf(alice, bob))
+        }
+        GameState(alice commitsTo UniqueIdentifier() with (10L issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 0,
                 UniqueIdentifier(), listOf(alice, bob))
     }
 }

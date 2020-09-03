@@ -35,10 +35,14 @@ object GameFlows {
             require(commitDeadline < revealDeadline) { "The commit deadline must come before the reveal one" }
         }
 
-        val playerBettor: Bettor
+        val playerBettor
             get() = Bettor(player, issuer, playerWager)
-        val casinoBettor: Bettor
-            get() = Bettor(casino, issuer, Math.multiplyExact(playerWager, GameParameters.casinoToPlayerRatio))
+        val casinoBettor
+            get() = Bettor(casino, issuer, casinoWager)
+        val casinoWager
+            get() = Math.multiplyExact(playerWager, GameParameters.casinoToPlayerRatio )
+        val totalBetted
+            get() = Math.addExact(playerWager, casinoWager)
 
         fun playerCommittedBettor(commitId: UniqueIdentifier) =
                 player commitsTo commitId with (playerWager issuedBy issuer)
@@ -117,8 +121,12 @@ object GameFlows {
             casinoSession.send(setup)
             // First notary, not caring much...
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
-            // Player asks casino for commit and prepares double commits
-            val commitTx = subFlow(CommitFlows.Initiator(notary, playerImage.hash, setup, casinoSession))
+            // Player collects enough tokens for the wager.
+            val playerTokens = subFlow(LockableTokenFlows.Fetch.Local(player, issuer,
+                    playerWager, currentTopLevel?.runId?.uuid ?: throw FlowException("No running id")))
+            // Player asks casino for commit and prepares double commits.
+            val commitTx = subFlow(CommitFlows.Initiator(notary, playerImage.hash, setup, playerTokens,
+                    casinoSession))
             val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
             val playerCommitRef = commitTx.tx.outRefsOfType<CommittedState>()
                     .single { it.state.data.creator == player }
@@ -155,9 +163,12 @@ object GameFlows {
                 throw FlowException("Commit deadline is too far in the future")
             if (commitDeadline.plus(GameParameters.revealDuration) != revealDeadline)
                 throw FlowException("Reveal deadline is incorrect")
+            // Casino collects enough tokens for the wager.
+            val casinoTokens = subFlow(LockableTokenFlows.Fetch.Local(casino, issuer,
+                    setup.casinoWager, currentTopLevel?.runId?.uuid ?: throw FlowException("No running id")))
             // Casino gives commit info and gets both commits tx.
             val commitTx = subFlow(CommitFlows.Responder(
-                    playerSession, setup, casinoImage.hash))
+                    playerSession, setup, casinoImage.hash, casinoTokens))
             val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
             val casinoCommitRef = commitTx.tx.outRefsOfType<CommittedState>()
                     .single { it.state.data.creator == casino }

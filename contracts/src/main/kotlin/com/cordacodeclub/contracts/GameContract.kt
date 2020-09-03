@@ -2,6 +2,7 @@ package com.cordacodeclub.contracts
 
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.GameState
+import com.cordacodeclub.states.LockableTokenState
 import com.cordacodeclub.states.RevealedState
 import net.corda.core.contracts.*
 import net.corda.core.contracts.Requirements.using
@@ -80,6 +81,14 @@ class GameContract : Contract {
                 .map { it.committer.holder.owningKey }
                 .toSet()
                 .equals(signers.toSet())
+        "The output locked token index must be possible" using (gameState.lockedWagersOutputIndex < tx.outputs.size)
+        val lockedToken = tx.getOutput(gameState.lockedWagersOutputIndex)
+                .also { "There must be a LockableTokenState at the output index" using (it is LockableTokenState) }
+                .let { it as LockableTokenState }
+        "The output locked token must be locked" using lockedToken.isLocked
+        "The output locked token must have the same issuer as the game" using (lockedToken.issuer == gameState.tokenIssuer)
+        "The output locked token must have the right amount" using (lockedToken.amount == gameState.bettedAmount)
+
         return tx.outRef(create.outputIndex)
     }
 

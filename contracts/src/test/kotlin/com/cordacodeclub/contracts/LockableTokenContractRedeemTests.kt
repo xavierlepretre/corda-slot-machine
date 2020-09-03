@@ -170,7 +170,8 @@ class LockableTokenContractRedeemTests {
             command(listOf(casino.owningKey, issuer.owningKey), Redeem(listOf(0, 1), listOf(0)))
 
             tweak {
-                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(4, LockableTokenType)))
+                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(4, LockableTokenType),
+                        listOf(casino, player)))
                 failsWith("The inputs must be unlocked")
             }
 
@@ -187,7 +188,8 @@ class LockableTokenContractRedeemTests {
             command(listOf(casino.owningKey, issuer.owningKey), Redeem(listOf(0), listOf(0, 1)))
 
             tweak {
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                        listOf(casino, player)))
                 failsWith("The outputs must be unlocked")
             }
 

@@ -17,6 +17,7 @@ import net.corda.core.identity.AbstractParty
 data class GameState(
         val casino: CommittedBettor,
         val player: CommittedBettor,
+        val lockedWagersOutputIndex: Int,
         override val linearId: UniqueIdentifier,
         override val participants: List<AbstractParty>) : LinearState {
 
@@ -24,5 +25,12 @@ data class GameState(
         require(participants.isNotEmpty()) { "There must be participants" }
         require(casino.issuedAmount.issuer == player.issuedAmount.issuer) { "The issuers must be the same" }
         require(casino.committer.holder != player.committer.holder) { "The holders must be different" }
+        require(0 <= lockedWagersOutputIndex) { "Locked wager output index must be positive" }
     }
+
+    val tokenIssuer
+        get() = casino.issuedAmount.issuer
+
+    val bettedAmount
+        get() = casino.issuedAmount.amount.plus(player.issuedAmount.amount)
 }

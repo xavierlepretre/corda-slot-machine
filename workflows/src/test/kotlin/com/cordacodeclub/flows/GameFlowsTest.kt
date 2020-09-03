@@ -109,9 +109,18 @@ class GameFlowsTest {
     }
 
     @Test
-    fun `can launch the game along the happy path`() {
+    fun `can launch the game along the happy path without change`() {
         issueToken(issuerNode, casino1, issuer, GameParameters.casinoToPlayerRatio)
         issueToken(issuerNode, player1, issuer, 1L)
+        playerNode.startFlow(GameFlows.Initiator(player1, 1L, issuer, casino1))
+                .also { network.runNetwork() }
+                .get()
+    }
+
+    @Test
+    fun `can launch the game along the happy path with change`() {
+        issueToken(issuerNode, casino1, issuer, GameParameters.casinoToPlayerRatio + 2L)
+        issueToken(issuerNode, player1, issuer, 2L)
         playerNode.startFlow(GameFlows.Initiator(player1, 1L, issuer, casino1))
                 .also { network.runNetwork() }
                 .get()

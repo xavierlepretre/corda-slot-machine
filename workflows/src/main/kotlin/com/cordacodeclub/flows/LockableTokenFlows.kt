@@ -5,6 +5,8 @@ import com.cordacodeclub.contracts.LockableTokenContract
 import com.cordacodeclub.schema.LockableTokenSchemaV1
 import com.cordacodeclub.states.LockableTokenState
 import com.cordacodeclub.states.LockableTokenType
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlow
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlowHandler
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.flows.*
@@ -61,6 +63,7 @@ object LockableTokenFlows {
                     if (it == ourIdentity) null
                     else initiateFlow(it)
                 }
+                holderFlows.forEach { subFlow(SyncKeyMappingFlow(it, listOf(issuer))) }
                 return subFlow(FinalityFlow(signed, holderFlows, StatesToRecord.ALL_VISIBLE))
             }
         }
@@ -72,7 +75,10 @@ object LockableTokenFlows {
         class Responder(private val issuerSession: FlowSession) : FlowLogic<SignedTransaction>() {
 
             @Suspendable
-            override fun call() = subFlow(ReceiveFinalityFlow(issuerSession))
+            override fun call(): SignedTransaction {
+                subFlow(SyncKeyMappingFlowHandler(issuerSession))
+                return subFlow(ReceiveFinalityFlow(issuerSession))
+            }
         }
     }
 

@@ -4,10 +4,7 @@ import com.cordacodeclub.contracts.CommitContract.Commands.*
 import com.cordacodeclub.contracts.GameContract.Commands.Create
 import com.cordacodeclub.contracts.GameContract.Commands.Resolve
 import com.cordacodeclub.states.*
-import net.corda.core.contracts.StateAndRef
-import net.corda.core.contracts.StaticPointer
-import net.corda.core.contracts.TimeWindow
-import net.corda.core.contracts.UniqueIdentifier
+import net.corda.core.contracts.*
 import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.common.internal.testNetworkParameters
@@ -41,16 +38,21 @@ class GameContractResolveTests {
         val casinoId = UniqueIdentifier()
         val playerId = UniqueIdentifier()
         val revealDeadline = Instant.now().plusSeconds(60)
+        input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
         output(CommitContract.id, CommittedState(casinoHash, casino,
                 revealDeadline, 2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
                 revealDeadline, 2, playerId))
         output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
-                player commitsTo playerId with (1L issuedBy issuer),
+                player commitsTo playerId with (1L issuedBy issuer), 3,
                 UniqueIdentifier(), listOf(casino, player)))
+        output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+                listOf(casino, player)))
+        output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
         command(casino.owningKey, Commit(0))
         command(player.owningKey, Commit(1))
         command(listOf(casino.owningKey, player.owningKey), Create(2))
+        command(player.owningKey, LockableTokenContract.Commands.Lock(listOf(0), listOf(3, 4)))
         verifies()
     }
 

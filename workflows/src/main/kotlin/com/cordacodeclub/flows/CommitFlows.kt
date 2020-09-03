@@ -3,12 +3,12 @@ package com.cordacodeclub.flows
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Commit
 import com.cordacodeclub.contracts.GameContract.Commands.Create
+import com.cordacodeclub.contracts.LockableTokenContract.Commands.Lock
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.GameState
-import net.corda.core.contracts.Command
-import net.corda.core.contracts.ContractState
-import net.corda.core.contracts.TimeWindow
-import net.corda.core.contracts.UniqueIdentifier
+import com.cordacodeclub.states.LockableTokenState
+import com.cordacodeclub.states.LockableTokenType
+import net.corda.core.contracts.*
 import net.corda.core.crypto.SecureHash
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
@@ -31,11 +31,12 @@ object CommitFlows {
             val notary: Party,
             val playerHash: SecureHash,
             val setup: GameFlows.GameSetup,
+            val playerTokens: List<StateAndRef<LockableTokenState>>,
             val casinoSession: FlowSession) : FlowLogic<SignedTransaction>() {
 
         @Suspendable
         override fun call(): SignedTransaction {
-            val (_, _, _, casino,
+            val (player, playerWager, issuer, casino,
                     commitDeadline, revealDeadline) = setup
             if (casinoSession.counterparty != serviceHub.identityService.wellKnownPartyFromAnonymous(casino)
                     ?: throw FlowException("Cannot resolve the casino host"))
@@ -51,10 +52,47 @@ object CommitFlows {
                             casinoCommitId, listOf(setup.player, casino)))
                     .addCommand(Command(Commit(1), casino.owningKey))
                     .addOutputState(GameState(setup.casinoCommittedBettor(casinoCommitId),
-                            setup.playerCommittedBettor(playerCommitId),
+                            setup.playerCommittedBettor(playerCommitId), 3,
                             UniqueIdentifier(), listOf(setup.player, casino)))
                     .addCommand(Create(2), listOf(setup.casino.owningKey, setup.player.owningKey))
+                    .addOutputState(LockableTokenState(issuer, Amount(setup.totalBetted, LockableTokenType),
+                            listOf(casino, player)))
                     .setTimeWindow(TimeWindow.untilOnly(commitDeadline))
+
+            // Add player tokens.
+            val playerChange = playerTokens
+                    .map { it.state.data.amount }
+                    .reduce(Amount<LockableTokenType>::plus)
+                    .minus(Amount(playerWager, LockableTokenType))
+            val playerTokenInputIndices = playerTokens.mapIndexed { index, state ->
+                builder.addInputState(state)
+                index
+            }
+            val playerTokenOutputIndices = if (Amount(0L, LockableTokenType) < playerChange) {
+                builder.addOutputState(LockableTokenState(player, issuer, playerChange))
+                listOf(3, 4)
+            } else listOf(3)
+            subFlow(SendStateAndRefFlow(casinoSession, playerTokens))
+            // Add casino tokens.
+            val casinoTokens = subFlow(ReceiveStateAndRefFlow<LockableTokenState>(casinoSession))
+            val casinoChange = casinoTokens
+                    .map { it.state.data.amount }
+                    .reduce(Amount<LockableTokenType>::plus)
+                    .minus(Amount(Math.multiplyExact(playerWager, GameParameters.casinoToPlayerRatio), LockableTokenType))
+            val currentInputCount = builder.inputStates().size
+            val currentOutputCount = builder.outputStates().size
+            val casinoTokenInputIndices = casinoTokens.mapIndexed { index, state ->
+                builder.addInputState(state)
+                currentInputCount + index
+            }
+            val casinoTokenOutputIndices = if (Amount(0L, LockableTokenType) < casinoChange) {
+                builder.addOutputState(LockableTokenState(casino, issuer, casinoChange))
+                listOf(currentOutputCount)
+            } else listOf()
+            builder.addCommand(Lock(playerTokenInputIndices + casinoTokenInputIndices,
+                    playerTokenOutputIndices + casinoTokenOutputIndices),
+                    listOf(player.owningKey, casino.owningKey))
+
             builder.verify(serviceHub)
             val partiallySignedTx = serviceHub.signInitialTransaction(builder, setup.player.owningKey)
             val fullySignedTx = subFlow(CollectSignaturesFlow(
@@ -70,7 +108,8 @@ object CommitFlows {
     class Responder(
             val playerSession: FlowSession,
             val setup: GameFlows.GameSetup,
-            val casinoHash: SecureHash) : FlowLogic<SignedTransaction>() {
+            val casinoHash: SecureHash,
+            val casinoTokens: List<StateAndRef<LockableTokenState>>) : FlowLogic<SignedTransaction>() {
 
         companion object {
             const val minCommits = 2
@@ -82,15 +121,22 @@ object CommitFlows {
                     ?: throw FlowException("Cannot resolve the player host"))
                 throw FlowException("The playerSession is not for the player")
             playerSession.send(casinoHash)
+            subFlow(ReceiveStateAndRefFlow<LockableTokenState>(playerSession))
+            subFlow(SendStateAndRefFlow(playerSession, casinoTokens))
+            val casinoChange = casinoTokens
+                    .map { it.state.data.amount }
+                    .reduce(Amount<LockableTokenType>::plus)
+                    .minus(Amount(Math.multiplyExact(setup.playerWager, GameParameters.casinoToPlayerRatio),
+                            LockableTokenType))
             val fullySignedTx = subFlow(object : SignTransactionFlow(playerSession) {
 
                 override fun checkTransaction(stx: SignedTransaction) {
-                    // Only 2 commands with a local key, i.e. to sign by me.
+                    // Only 3 commands with a local key, i.e. to sign by me.
                     val myCommands = stx.tx.commands.filter {
                         it.signers.any(serviceHub::isLocalKey)
                     }
-                    if (myCommands.size != 2)
-                        throw FlowException("I should have only 2 commands to sign")
+                    if (myCommands.size != 3)
+                        throw FlowException("I should have only 3 commands to sign")
 
                     val myCommitCommand = myCommands
                             .mapNotNull { it.value as? Commit }
@@ -131,6 +177,36 @@ object CommitFlows {
                     if (gameState.casino.issuedAmount.amount.quantity !=
                             Math.multiplyExact(gameState.player.issuedAmount.amount.quantity, GameParameters.casinoToPlayerRatio))
                         throw FlowException("The casino amount should be the expected ratio with the player amount")
+
+                    val myLockCommand = myCommands
+                            .mapNotNull { it.value as? Lock }
+                            .singleOrNull()
+                            ?: throw FlowException("I should have only 1 Lock command to sign")
+                    val myStates = myLockCommand.inputIndices
+                            .map {
+                                try {
+                                    serviceHub.toStateAndRef<LockableTokenState>(stx.tx.inputs[it])
+                                } catch (e: ClassCastException) {
+                                    throw FlowException(e)
+                                }
+                            }
+                            .filter { ref ->
+                                ref.state.data
+                                        .also { if (it.isLocked) throw FlowException("No input token should be locked") }
+                                        .let { serviceHub.isLocalKey(it.holder!!.owningKey) }
+                            }
+                            .toSet()
+                    if (myStates != casinoTokens.toSet())
+                        throw FlowException("Unexpected tokens of casino in inputs")
+                    val myChange = myLockCommand.outputIndices
+                            .map { stx.tx.outputStates[it] }
+                            .filterIsInstance<LockableTokenState>()
+                            .filter { it.holder == setup.casino }
+                    if (0 < casinoChange.quantity) {
+                        if (myChange.size != 1) throw FlowException("Casino expected some change")
+                        if (myChange.single().amount != casinoChange)
+                            throw FlowException("Casino change is not the expected amount")
+                    }
 
                     // TODO Adds checks on the other commit state, as per the game state?
                 }

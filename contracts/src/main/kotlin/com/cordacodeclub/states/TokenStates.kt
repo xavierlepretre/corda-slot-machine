@@ -20,23 +20,20 @@ class LockableTokenState private constructor(
         val holder: AbstractParty?,
         val isLocked: Boolean,
         val issuer: AbstractParty,
-        val amount: Amount<LockableTokenType>) : ContractState, QueryableState {
+        val amount: Amount<LockableTokenType>,
+        override val participants: List<AbstractParty>) : ContractState, QueryableState {
 
     init {
         require(isLocked == (holder == null)) { "Is locked should reflect that holder is null" }
     }
 
-    constructor(issuer: AbstractParty, amount: Amount<LockableTokenType>)
-            : this(null, true, issuer, amount)
+    constructor(issuer: AbstractParty, amount: Amount<LockableTokenType>, participants: List<AbstractParty>)
+            : this(null, true, issuer, amount, participants)
 
     constructor(holder: AbstractParty, issuer: AbstractParty, amount: Amount<LockableTokenType>)
-            : this(holder, false, issuer, amount)
+            : this(holder, false, issuer, amount, listOf(holder))
 
     constructor(bettor: Bettor) : this(bettor.holder, bettor.issuedAmount.issuer, bettor.issuedAmount.amount)
-
-    override val participants = listOfNotNull(holder)
-            .takeIf { it.isNotEmpty() }
-            ?: listOf(issuer)
 
     override fun generateMappedObject(schema: MappedSchema): PersistentState {
         return when (schema) {
@@ -80,6 +77,7 @@ data class IssuedAmount(val issuer: AbstractParty,
 }
 
 infix fun Long.issuedBy(issuer: AbstractParty) = IssuedAmount(issuer, this)
+infix fun Amount<LockableTokenType>.issuedBy(issuer: AbstractParty) = IssuedAmount(issuer, this)
 
 @CordaSerializable
 data class Bettor(val holder: AbstractParty,
