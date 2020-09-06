@@ -1,6 +1,8 @@
 package com.cordacodeclub.contracts
 
 import com.cordacodeclub.contracts.CommitContract.Commands.*
+import com.cordacodeclub.contracts.GameContract.Commands.Resolve
+import com.cordacodeclub.contracts.LockableTokenContract.Commands.Release
 import com.cordacodeclub.states.*
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.StateAndRef
@@ -44,10 +46,10 @@ class CommitContractUseTests {
                 revealDeadline, 2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
                 revealDeadline, 2, playerId))
-        output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+        output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                 player commitsTo playerId with (1L issuedBy issuer), 3,
                 UniqueIdentifier(), listOf(casino, player)))
-        output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+        output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                 listOf(casino, player)))
         output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
         command(casino.owningKey, Commit(0))
@@ -74,16 +76,21 @@ class CommitContractUseTests {
         val casinoImage = CommitImage.createRandom(random)
         val playerImage = CommitImage.createRandom(random)
         ledgerServices.ledger {
-            val (casinoRef, playerRef) = issueTwoCommits(
-                    casinoImage.hash, playerImage.hash).outRefsOfType<CommittedState>()
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
             val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
             transaction {
                 input(casinoRevealRef.ref)
                 input(playerRevealRef.ref)
                 input(casinoRef.getGamePointer().pointer)
+                input(lockedRef.ref)
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
+
                 command(player.owningKey, Use(1))
-                command(player.owningKey, GameContract.Commands.Resolve(2))
+                command(player.owningKey, Resolve(2))
+                command(player.owningKey, Release(listOf(3), listOf(0)))
 
                 tweak {
                     command(casino.owningKey, Use(2))
@@ -101,18 +108,22 @@ class CommitContractUseTests {
         val casinoImage = CommitImage.createRandom(random)
         val playerImage = CommitImage.createRandom(random)
         ledgerServices.ledger {
-            val (casinoRef, playerRef) = issueTwoCommits(casinoImage.hash, playerImage.hash)
-                    .outRefsOfType<CommittedState>()
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
             val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
             transaction {
                 input(casinoRevealRef.ref)
                 input(playerRevealRef.ref)
+                input(lockedRef.ref)
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
                 command(casino.owningKey, Use(0))
                 command(player.owningKey, Use(1))
-                command(player.owningKey, GameContract.Commands.Resolve(2))
+                command(player.owningKey, Release(listOf(2), listOf(0)))
+                command(player.owningKey, Resolve(3))
 
-                failsWith("The game must be in input")
+                failsWith("Missing required encumbrance 2")
 
                 input(casinoRef.getGamePointer().pointer)
                 verifies()
@@ -125,20 +136,24 @@ class CommitContractUseTests {
         val casinoImage = CommitImage.createRandom(random)
         val playerImage = CommitImage.createRandom(random)
         ledgerServices.ledger {
-            val (casinoRef, playerRef) = issueTwoCommits(
-                    casinoImage.hash, playerImage.hash).outRefsOfType<CommittedState>()
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
             val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
             transaction {
                 input(casinoRevealRef.ref)
                 input(casinoRef.getGamePointer().pointer)
+                input(lockedRef.ref)
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
                 command(casino.owningKey, Use(0))
-                command(player.owningKey, GameContract.Commands.Resolve(1))
+                command(player.owningKey, Resolve(1))
+                command(player.owningKey, Release(listOf(2), listOf(0)))
 
                 failsWith("All the game commit ids must be present")
 
                 input(playerRevealRef.ref)
-                command(player.owningKey, Use(2))
+                command(player.owningKey, Use(3))
                 verifies()
             }
         }
@@ -149,8 +164,9 @@ class CommitContractUseTests {
         val casinoImage = CommitImage.createRandom(random)
         val playerImage = CommitImage.createRandom(random)
         ledgerServices.ledger {
-            val (casinoRef1, playerRef1) = issueTwoCommits(
-                    casinoImage.hash, playerImage.hash).outRefsOfType<CommittedState>()
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef1, playerRef1) = issueTx.outRefsOfType<CommittedState>()
+            val (lockedRef1) = issueTx.outRefsOfType<LockableTokenState>()
             val (casinoRevealRef1) = reveal(casinoRef1, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef1) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
             val (_, playerRef2) = issueTwoCommits(
@@ -159,9 +175,12 @@ class CommitContractUseTests {
                 input(casinoRef1.getGamePointer().pointer)
                 input(casinoRevealRef1.ref)
                 input(playerRevealRef1.ref)
-                command(player.owningKey, GameContract.Commands.Resolve(0))
+                input(lockedRef1.ref)
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
+                command(player.owningKey, Resolve(0))
                 command(casino.owningKey, Use(1))
                 command(player.owningKey, Use(2))
+                command(player.owningKey, Release(listOf(3), listOf(0)))
                 verifies()
 
                 tweak {
@@ -170,7 +189,7 @@ class CommitContractUseTests {
 
                     output(CommitContract.id, RevealedState(playerImage, player,
                             playerRef2.getGamePointer(), playerRef2.state.data.linearId))
-                    command(player.owningKey, Reveal(3, 0))
+                    command(player.owningKey, Reveal(4, 1))
                     reference(playerRef2.getGamePointer().pointer)
                     timeWindow(TimeWindow.untilOnly(Instant.now()))
                     verifies()
@@ -182,7 +201,7 @@ class CommitContractUseTests {
                     failsWith("All outputs states which belong to one party must have an associated command")
 
                     input(playerRef2.ref)
-                    command(player.owningKey, Reveal(3, 0))
+                    command(player.owningKey, Reveal(4, 1))
                     reference(playerRef2.getGamePointer().pointer)
                     timeWindow(TimeWindow.untilOnly(Instant.now()))
                     verifies()
@@ -197,16 +216,20 @@ class CommitContractUseTests {
         val casinoImage = CommitImage.createRandom(random)
         val playerImage = CommitImage.createRandom(random)
         ledgerServices.ledger {
-            val (casinoRef, playerRef) = issueTwoCommits(
-                    casinoImage.hash, playerImage.hash).outRefsOfType<CommittedState>()
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
             val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
             transaction {
                 input(casinoRef.getGamePointer().pointer)
                 input(casinoRevealRef.ref)
                 input(playerRevealRef.ref)
-                command(player.owningKey, GameContract.Commands.Resolve(0))
+                input(lockedRef.ref)
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
+                command(player.owningKey, Resolve(0))
                 command(casino.owningKey, Use(1))
+                command(player.owningKey, Release(listOf(3), listOf(0)))
 
                 tweak {
                     command(casino.owningKey, Use(2))

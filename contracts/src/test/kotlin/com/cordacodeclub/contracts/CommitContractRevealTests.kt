@@ -45,10 +45,10 @@ class CommitContractRevealTests {
         input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
         output(CommitContract.id, CommittedState(casinoHash, casino, revealDeadline, 2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player, revealDeadline, 2, playerId))
-        output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+        output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                 player commitsTo playerId with (1L issuedBy issuer), 3,
                 UniqueIdentifier(), listOf(casino, player)))
-        output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+        output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                 listOf(casino, player)))
         output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
         command(casino.owningKey, Commit(0))

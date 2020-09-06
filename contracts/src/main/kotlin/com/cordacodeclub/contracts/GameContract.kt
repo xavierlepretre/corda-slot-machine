@@ -59,7 +59,8 @@ class GameContract : Contract {
     private fun verifyCreate(tx: LedgerTransaction, create: Commands.Create, signers: List<PublicKey>,
                              outputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>): StateAndRef<GameState> {
         "The output must be a GameState" using (tx.outputStates[create.outputIndex] is GameState)
-        val gameState = tx.outputStates[create.outputIndex] as GameState
+        val gameRef = tx.outRef<GameState>(create.outputIndex)
+        val gameState = gameRef.state.data
         val associatedCommits = listOf(gameState.casino, gameState.player)
                 .map { outputIds[it.committer.linearId] }
         "The commit ids must all be associated CommittedStates" using associatedCommits.all { pair ->
@@ -88,6 +89,10 @@ class GameContract : Contract {
         "The output locked token must be locked" using lockedToken.isLocked
         "The output locked token must have the same issuer as the game" using (lockedToken.issuer == gameState.tokenIssuer)
         "The output locked token must have the right amount" using (lockedToken.amount == gameState.bettedAmount)
+        val lockedTokenRef = tx.outRef<LockableTokenState>(gameState.lockedWagersOutputIndex)
+        "The output locked token and the game must be mutually encumbered" using
+                (gameRef.state.encumbrance == gameState.lockedWagersOutputIndex
+                        && lockedTokenRef.state.encumbrance == create.outputIndex)
 
         return tx.outRef(create.outputIndex)
     }

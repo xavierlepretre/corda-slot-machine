@@ -3,7 +3,9 @@ package com.cordacodeclub.flows
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Use
 import com.cordacodeclub.contracts.GameContract.Commands.Resolve
+import com.cordacodeclub.contracts.LockableTokenContract.Commands.Release
 import com.cordacodeclub.states.GameState
+import com.cordacodeclub.states.LockableTokenState
 import com.cordacodeclub.states.RevealedState
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.flows.*
@@ -23,6 +25,7 @@ object UseFlows {
             val playerRef: StateAndRef<RevealedState>,
             val casinoRef: StateAndRef<RevealedState>,
             val gameRef: StateAndRef<GameState>,
+            val lockedTokenRef: StateAndRef<LockableTokenState>,
             val casinoSession: FlowSession) : FlowLogic<SignedTransaction>() {
 
         @Suspendable
@@ -39,6 +42,10 @@ object UseFlows {
                     .addCommand(Use(1), player.owningKey)
                     .addInputState(gameRef)
                     .addCommand(Resolve(2), player.owningKey)
+                    .addInputState(lockedTokenRef)
+                    .addOutputState(LockableTokenState(casino, gameRef.state.data.tokenIssuer,
+                            gameRef.state.data.bettedAmount))
+                    .addCommand(Release(listOf(3), listOf(0)), player.owningKey)
             builder.verify(serviceHub)
             val signedTx = serviceHub.signInitialTransaction(builder, player.owningKey)
             return subFlow(FinalityFlow(signedTx, casinoSession))

@@ -2,7 +2,9 @@ package com.cordacodeclub.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Commit
+import com.cordacodeclub.contracts.GameContract
 import com.cordacodeclub.contracts.GameContract.Commands.Create
+import com.cordacodeclub.contracts.LockableTokenContract
 import com.cordacodeclub.contracts.LockableTokenContract.Commands.Lock
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.GameState
@@ -51,12 +53,16 @@ object CommitFlows {
                     .addOutputState(CommittedState(casinoHash, casino, revealDeadline, 2,
                             casinoCommitId, listOf(setup.player, casino)))
                     .addCommand(Command(Commit(1), casino.owningKey))
-                    .addOutputState(GameState(setup.casinoCommittedBettor(casinoCommitId),
-                            setup.playerCommittedBettor(playerCommitId), 3,
-                            UniqueIdentifier(), listOf(setup.player, casino)))
+                    .addOutputState(
+                            GameState(setup.casinoCommittedBettor(casinoCommitId),
+                                    setup.playerCommittedBettor(playerCommitId), 3,
+                                    UniqueIdentifier(), listOf(setup.player, casino)),
+                            GameContract.id, notary, 3)
                     .addCommand(Create(2), listOf(setup.casino.owningKey, setup.player.owningKey))
-                    .addOutputState(LockableTokenState(issuer, Amount(setup.totalBetted, LockableTokenType),
-                            listOf(casino, player)))
+                    .addOutputState(
+                            LockableTokenState(issuer, Amount(setup.totalBetted, LockableTokenType),
+                                    listOf(casino, player)),
+                            LockableTokenContract.id, notary, 2)
                     .setTimeWindow(TimeWindow.untilOnly(commitDeadline))
 
             // Add player tokens.

@@ -40,7 +40,7 @@ object GameFlows {
         val casinoBettor
             get() = Bettor(casino, issuer, casinoWager)
         val casinoWager
-            get() = Math.multiplyExact(playerWager, GameParameters.casinoToPlayerRatio )
+            get() = Math.multiplyExact(playerWager, GameParameters.casinoToPlayerRatio)
         val totalBetted
             get() = Math.addExact(playerWager, casinoWager)
 
@@ -130,6 +130,8 @@ object GameFlows {
             val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
             val playerCommitRef = commitTx.tx.outRefsOfType<CommittedState>()
                     .single { it.state.data.creator == player }
+            val lockedTokenRef = commitTx.tx.outRefsOfType<LockableTokenState>()
+                    .single { it.state.data.isLocked }
 
             // Player reveals secretly.
             val playerRevealTx = subFlow(RevealFlows.Initiator(
@@ -141,7 +143,7 @@ object GameFlows {
 
             // Player initiates resolution.
             val useTx = subFlow(UseFlows.Initiator(
-                    playerRevealedRef, casinoRevealed, gameRef, casinoSession))
+                    playerRevealedRef, casinoRevealed, gameRef, lockedTokenRef, casinoSession))
 
             //TODO("Return the outcome for the RPC")
         }

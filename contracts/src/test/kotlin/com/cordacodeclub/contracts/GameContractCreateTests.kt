@@ -42,13 +42,13 @@ class GameContractCreateTests {
                     revealDeadline, 4, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 4, playerId))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 4, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))
             command(player.owningKey, Commit(1))
             command(player.owningKey, Lock(listOf(0), listOf(2, 3)))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 2, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 2,
                     UniqueIdentifier(), listOf(casino, player)))
             failsWith("The GameContract must find at least 1 command")
@@ -69,13 +69,13 @@ class GameContractCreateTests {
                     revealDeadline, 4, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 4, playerId))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 4, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))
             command(player.owningKey, Commit(1))
             command(player.owningKey, Lock(listOf(0), listOf(2, 3)))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 2, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 2,
                     UniqueIdentifier(), listOf(casino, player)))
 
@@ -101,10 +101,10 @@ class GameContractCreateTests {
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     gameId1, listOf(casino, player)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))
@@ -133,10 +133,10 @@ class GameContractCreateTests {
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     gameId1, listOf(casino, player)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))
@@ -163,10 +163,10 @@ class GameContractCreateTests {
             input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     revealDeadline, 1, casinoId))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 2, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 2,
                     gameId1, listOf(casino, player)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 1, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))
@@ -196,10 +196,10 @@ class GameContractCreateTests {
             input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     revealDeadline, 1, casinoId))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 2, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 2,
                     gameId1, listOf(casino, player)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 1, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))
@@ -232,10 +232,10 @@ class GameContractCreateTests {
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     gameId1, listOf(casino, player)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))
@@ -269,7 +269,7 @@ class GameContractCreateTests {
                     revealDeadline, 4, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 4, playerId))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 4, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))
@@ -278,13 +278,13 @@ class GameContractCreateTests {
             command(player.owningKey, Lock(listOf(0), listOf(2, 3)))
 
             tweak {
-                output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                output(GameContract.id, 2, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                         player commitsTo playerId with (1L issuedBy issuer), 5,
                         gameId1, listOf(casino, player)))
                 failsWith("The output locked token index must be possible")
             }
 
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 2, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 2,
                     gameId1, listOf(casino, player)))
             verifies()
@@ -303,7 +303,7 @@ class GameContractCreateTests {
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     gameId1, listOf(casino, player)))
             command(casino.owningKey, Commit(0))
@@ -311,14 +311,14 @@ class GameContractCreateTests {
             command(listOf(casino.owningKey, player.owningKey), Create(2))
 
             tweak {
-                output(DummyContract.PROGRAM_ID, DummyState())
+                output(DummyContract.PROGRAM_ID, 2, DummyState())
                 output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                         listOf(casino, player)))
                 command(player.owningKey, Lock(listOf(0), listOf(4)))
                 failsWith("There must be a LockableTokenState at the output index")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             command(player.owningKey, Lock(listOf(0), listOf(3)))
             verifies()
@@ -337,8 +337,8 @@ class GameContractCreateTests {
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 4,
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                    player commitsTo playerId with (1L issuedBy issuer), 3,
                     gameId1, listOf(casino, player)))
             command(casino.owningKey, Commit(0))
             command(player.owningKey, Commit(1))
@@ -346,15 +346,15 @@ class GameContractCreateTests {
             command(player.owningKey, Lock(listOf(0), listOf(3, 4)))
 
             tweak {
+                output(LockableTokenContract.id, 2, LockableTokenState(player, issuer, Amount(11L, LockableTokenType)))
                 output(LockableTokenContract.id, LockableTokenState(issuer, Amount(1L, LockableTokenType),
                         listOf(casino, player)))
-                output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(11L, LockableTokenType)))
                 failsWith("The output locked token must be locked")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
+            output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             verifies()
         }
     }
@@ -371,7 +371,7 @@ class GameContractCreateTests {
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 4, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 4,
                     gameId1, listOf(casino, player)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
@@ -381,7 +381,7 @@ class GameContractCreateTests {
 
             tweak {
                 input(LockableTokenContract.id, LockableTokenState(player, player, Amount(11L, LockableTokenType)))
-                output(LockableTokenContract.id, LockableTokenState(player, Amount(11L, LockableTokenType),
+                output(LockableTokenContract.id, 2, LockableTokenState(player, Amount(11L, LockableTokenType),
                         listOf(casino, player)))
                 output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                         listOf(casino, player)))
@@ -390,7 +390,7 @@ class GameContractCreateTests {
                 failsWith("The output locked token must have the same issuer as the game")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             command(player.owningKey, Lock(listOf(0), listOf(3, 4)))
             verifies()
@@ -409,7 +409,7 @@ class GameContractCreateTests {
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     gameId1, listOf(casino, player)))
             command(casino.owningKey, Commit(0))
@@ -417,7 +417,7 @@ class GameContractCreateTests {
             command(listOf(casino.owningKey, player.owningKey), Create(2))
 
             tweak {
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(10L, LockableTokenType),
+                output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(10L, LockableTokenType),
                         listOf(casino, player)))
                 output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
                 command(player.owningKey, Lock(listOf(0), listOf(3, 4)))
@@ -425,15 +425,74 @@ class GameContractCreateTests {
             }
 
             tweak {
-                input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(12L, LockableTokenType),
+                output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(12L, LockableTokenType),
                         listOf(casino, player)))
+                input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
                 command(player.owningKey, Lock(listOf(0, 1), listOf(3)))
                 failsWith("The output locked token must have the right amount")
             }
 
             command(player.owningKey, Lock(listOf(0), listOf(3)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+                    listOf(casino, player)))
+            verifies()
+        }
+    }
+
+    @Test
+    fun `The output locked token and the created game must be mutually encumbered`() {
+        ledgerServices.transaction {
+            val casinoId = UniqueIdentifier()
+            val playerId = UniqueIdentifier()
+            val gameId1 = UniqueIdentifier()
+            val revealDeadline = Instant.now().plusSeconds(60)
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(11L, LockableTokenType)))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
+                    revealDeadline, 2, casinoId))
+            command(casino.owningKey, Commit(0))
+            command(player.owningKey, Commit(1))
+            command(listOf(casino.owningKey, player.owningKey), Create(2))
+            command(player.owningKey, Lock(listOf(0), listOf(3)))
+
+            tweak {
+                output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
+                        revealDeadline, 2, playerId))
+                output(GameContract.id, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                        player commitsTo playerId with (1L issuedBy issuer), 3,
+                        gameId1, listOf(casino, player)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+                        listOf(casino, player)))
+                failsWith("The output locked token and the game must be mutually encumbered")
+            }
+
+            tweak {
+                output(CommitContract.id, 2, CommittedState(SecureHash.randomSHA256(), player,
+                        revealDeadline, 2, playerId))
+                output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                        player commitsTo playerId with (1L issuedBy issuer), 3,
+                        gameId1, listOf(casino, player)))
+                output(LockableTokenContract.id, 1, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+                        listOf(casino, player)))
+                failsWith("The output locked token and the game must be mutually encumbered")
+            }
+
+            tweak {
+                output(CommitContract.id, 2, CommittedState(SecureHash.randomSHA256(), player,
+                        revealDeadline, 2, playerId))
+                output(GameContract.id, 1, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                        player commitsTo playerId with (1L issuedBy issuer), 3,
+                        gameId1, listOf(casino, player)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+                        listOf(casino, player)))
+                failsWith("The output locked token and the game must be mutually encumbered")
+            }
+
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
+                    revealDeadline, 2, playerId))
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                    player commitsTo playerId with (1L issuedBy issuer), 3,
+                    gameId1, listOf(casino, player)))
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
                     listOf(casino, player)))
             verifies()
         }
