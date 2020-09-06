@@ -497,4 +497,35 @@ class GameContractCreateTests {
             verifies()
         }
     }
+
+    @Test
+    fun `All output game states must be covered by a command`() {
+        ledgerServices.transaction {
+            val casinoId = UniqueIdentifier()
+            val playerId = UniqueIdentifier()
+            val gameId1 = UniqueIdentifier()
+            val revealDeadline = Instant.now().plusSeconds(60)
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
+                    revealDeadline, 2, casinoId))
+            output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
+                    revealDeadline, 2, playerId))
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                    player commitsTo playerId with (1L issuedBy issuer), 3,
+                    gameId1, listOf(casino, player)))
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+                    listOf(casino, player)))
+            output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
+            command(casino.owningKey, Commit(0))
+            command(player.owningKey, Commit(1))
+            command(listOf(casino.owningKey, player.owningKey), Create(2))
+            command(player.owningKey, Lock(listOf(0), listOf(3, 4)))
+            verifies()
+
+            output(GameContract.id,  GameState(casino commitsTo UniqueIdentifier() with (10L issuedBy issuer),
+                    player commitsTo UniqueIdentifier() with (1L issuedBy issuer), 3,
+                    UniqueIdentifier(), listOf(casino, player)))
+            failsWith("All output game states must have an associated command")
+        }
+    }
 }

@@ -54,6 +54,16 @@ class GameContract : Contract {
                     }
                 }
                 .toMultiMap()
+        requireThat {
+            "All input game states must have an associated command" using tx.inputs
+                    .filter { ref -> ref.state.data is GameState }
+                    .all { coveredStates[inputsKey]?.contains(it.ref) ?: false }
+            "All output game states must have an associated command" using tx.outputs
+                    .mapIndexedNotNull { index, state ->
+                        (state.data as? GameState)?.let { index }
+                    }
+                    .all { coveredStates[outputsKey]?.contains(StateRef(tx.id, it)) ?: false }
+        }
     }
 
     private fun verifyCreate(tx: LedgerTransaction, create: Commands.Create, signers: List<PublicKey>,

@@ -175,4 +175,37 @@ class GameContractResolveTests {
             }
         }
     }
+
+    @Test
+    fun `All input game states must be covered by a command`() {
+        val casinoImage = CommitImage.createRandom(random)
+        val playerImage = CommitImage.createRandom(random)
+        ledgerServices.ledger {
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
+            val (gameRef) = issueTx.outRefsOfType<GameState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
+            val issueTx2 = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (gameRef2) = issueTx2.outRefsOfType<GameState>()
+            val (lockedRef2) = issueTx2.outRefsOfType<LockableTokenState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            transaction {
+                input(gameRef.ref)
+                command(player.owningKey, Resolve(0))
+                input(lockedRef.ref)
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
+                command(player.owningKey, Release(listOf(1), listOf(0)))
+                input(casinoRevealRef.ref)
+                input(playerRevealRef.ref)
+                command(player.owningKey, Use(2))
+                command(player.owningKey, Use(3))
+                verifies()
+
+                input(gameRef2.ref)
+                input(lockedRef2.ref)
+                failsWith("All input game states must have an associated command")
+            }
+        }
+    }
 }
