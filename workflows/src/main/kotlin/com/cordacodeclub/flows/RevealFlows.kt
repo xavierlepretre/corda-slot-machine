@@ -7,10 +7,7 @@ import com.cordacodeclub.states.*
 import net.corda.core.contracts.ReferencedStateAndRef
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.TimeWindow
-import net.corda.core.flows.FinalityFlow
-import net.corda.core.flows.FlowLogic
-import net.corda.core.flows.FlowSession
-import net.corda.core.flows.ReceiveFinalityFlow
+import net.corda.core.flows.*
 import net.corda.core.identity.AbstractParty
 import net.corda.core.node.StatesToRecord
 import net.corda.core.transactions.SignedTransaction
