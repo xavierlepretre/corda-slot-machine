@@ -35,6 +35,14 @@ class LockableTokenState private constructor(
 
     constructor(bettor: Bettor) : this(bettor.holder, bettor.issuedAmount.issuer, bettor.issuedAmount.amount)
 
+    fun plus(other: LockableTokenState): LockableTokenState {
+        require(isLocked == other.isLocked) { "Both locked statuses must be equal" }
+        require(issuer == other.issuer) { "Both issuers must be equal" }
+        require(holder == other.holder) { "If unlocked both holders must be equal" }
+        return if (!isLocked) LockableTokenState(holder!!, issuer, amount.plus(other.amount))
+        else LockableTokenState(issuer, amount.plus(other.amount), participants.plus(other.participants).distinct())
+    }
+
     override fun generateMappedObject(schema: MappedSchema): PersistentState {
         return when (schema) {
             is LockableTokenSchemaV1 -> LockableTokenSchemaV1.PersistentLockableToken(
