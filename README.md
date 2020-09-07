@@ -1,1 +1,9 @@
-Empty project on which to start coding the slot machine.
+## States
+
+Commit State
+
+![](images/commit_state.png?raw=true)
+
+Reveal State
+
+![](images/reveal_state.png?raw=true)
