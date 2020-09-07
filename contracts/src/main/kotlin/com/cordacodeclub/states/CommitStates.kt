@@ -60,6 +60,34 @@ data class CommitImage(val picked: ByteArray) {
                     }
                 }
                 .let { CommitImage(it) }
+
+        /**
+         * @return A number that is to be understood as n out of 10,000.
+         */
+        fun playerPayoutCalculator(casinoImage: CommitImage, playerImage: CommitImage): Long {
+            // The first number is to be understood as out of 10,000.
+            // The second number is to be understood as out of 1,000.
+            val percentiles = listOf(
+                    3L to 1_000L,  // [1, "default", 6, 6, 6, 0.0003, 200, 200],
+                    18L to 250L,   // [2, "default", 4, 4, 4, 0.0015, 50, 50],
+                    53L to 100L,   // [3, "default", 2, 2, 2, 0.0035, 20, 20],
+                    98L to 75L,    // [4, "default", "1/3", "5/2", "4/6", 0.0045, 15, 15],
+                    153L to 65L,   // [5, "default", 5, 5, 5, 0.0055, 13, 13],
+                    233L to 60L,   // [6, "default", 1, 1, 1, 0.008, 12, 12],
+                    333L to 50L,   // [7, "default", 3, 3, 3, 0.01, 10, 10],
+                    1_233L to 20L, // [8, "default", "1/3/5", "1/3/5", "1/3/5", 0.09, 4, 4],
+                    10_000L to 0L
+            )
+            val imageResult = BigInteger(SecureHash.sha256(casinoImage.picked + playerImage.picked).bytes)
+                    .mod(BigInteger.valueOf(10_000L))
+                    .longValueExact()
+            return (percentiles
+                    .firstOrNull {
+                        imageResult < it.first
+                    }
+                    ?: percentiles.last())
+                    .second
+        }
     }
 
     init {
