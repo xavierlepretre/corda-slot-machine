@@ -207,11 +207,12 @@ In more detail:
 1. Assume that the "commit" phase of the commit-reveal has been completed, and notarised,
    with a notarised copy of the transaction successfully delivered to both parties.
 2. The Casino node reveals its secret to the Player node
-3. The Player node combines the Casino's secret with its own secret,
+3. The Player node reveals its secret to the Casino node
+4. Whichever is the winning node combines the two secrets,
    into a single final "reveal" transaction which finishes the game
 
-The reveal is asymmetric i.e. "Casino reveals before the Player".
-We could have defined that the other way around, i.e. "the Player reveals before the Casino", the choice is arbitrary.
+The reveal is asymmetric i.e. "Casino reveals before the Player" -- for reasons explained later, in the first two
+subsections of [Preventing malicious timeouts](#preventing-malicious-timeouts).
 
 ### What does a "foreclosure" flow look like?
 
