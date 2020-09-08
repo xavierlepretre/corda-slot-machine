@@ -22,7 +22,7 @@ class CommitContractCommitTests {
             cordappPackages = listOf("com.cordacodeclub.contracts", "net.corda.testing.contracts"),
             firstIdentity = notaryId,
             networkParameters = testNetworkParameters().copy(minimumPlatformVersion = 4))
-    private val issuerId = TestIdentity(CordaX500Name("Issuer", "Ansterdam", "NL"))
+    private val issuerId = TestIdentity(CordaX500Name("Issuer", "Amsterdam", "NL"))
     private val issuer = issuerId.identity.party
     private val casinoId = TestIdentity(CordaX500Name("Casino", "London", "GB"))
     private val casino = casinoId.identity.party
@@ -35,16 +35,18 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
             val revealDeadline = Instant.now().plusSeconds(60)
-            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
+            input(LockableTokenContract.id, LockableTokenState(player, issuer,
+                    Amount(GameState.maxPayoutRatio + 2L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 3,
+                    GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     UniqueIdentifier(), listOf(casino)))
             output(LockableTokenContract.id, 2, LockableTokenState(issuer,
-                    Amount(11L, LockableTokenType), listOf(player, casino)))
+                    Amount(200L, LockableTokenType), listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(listOf(casino.owningKey, player.owningKey), Create(2))
             command(player.owningKey, Lock(listOf(0), listOf(3, 4)))
@@ -62,15 +64,15 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
             val revealDeadline = Instant.now().plusSeconds(60)
-            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     UniqueIdentifier(), listOf(casino)))
-            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(player.owningKey, Commit(1))
@@ -93,15 +95,15 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
             val revealDeadline = Instant.now().plusSeconds(60)
-            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     UniqueIdentifier(), listOf(casino)))
-            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(player.owningKey, Commit(1))
@@ -129,8 +131,8 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
             val revealDeadline = Instant.now().plusSeconds(60)
-            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
-            output(LockableTokenContract.id, 4, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
+            output(LockableTokenContract.id, 4, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(player.owningKey, Lock(listOf(0), listOf(0, 1)))
@@ -143,7 +145,7 @@ class CommitContractCommitTests {
                         revealDeadline, -1, casinoId))
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                         revealDeadline, 4, playerId))
-                output(GameContract.id, 0, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                         player commitsTo playerId with (1L issuedBy issuer), 0,
                         UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game output index must be possible")
@@ -154,7 +156,7 @@ class CommitContractCommitTests {
                         revealDeadline, 5, casinoId))
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                         revealDeadline, 4, playerId))
-                output(GameContract.id, 0, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                         player commitsTo playerId with (1L issuedBy issuer), 0,
                         UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game output index must be possible")
@@ -164,7 +166,7 @@ class CommitContractCommitTests {
                     revealDeadline, 4, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 4, playerId))
-            output(GameContract.id, 0, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 0,
                     UniqueIdentifier(), listOf(casino, player)))
             verifies()
@@ -177,8 +179,8 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
             val revealDeadline = Instant.now().plusSeconds(60)
-            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
-            output(LockableTokenContract.id, 4, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
+            output(LockableTokenContract.id, 4, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(player.owningKey, Lock(listOf(0), listOf(0, 1)))
@@ -191,7 +193,7 @@ class CommitContractCommitTests {
                         revealDeadline, 3, casinoId))
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                         revealDeadline, 4, playerId))
-                output(GameContract.id, 0, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+                output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                         player commitsTo playerId with (1L issuedBy issuer), 0,
                         UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game output must be at the right index")
@@ -201,7 +203,7 @@ class CommitContractCommitTests {
                     revealDeadline, 4, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 4, playerId))
-            output(GameContract.id, 0, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 0,
                     UniqueIdentifier(), listOf(casino, player)))
             verifies()
@@ -214,11 +216,11 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
             val revealDeadline = Instant.now().plusSeconds(60)
-            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
-            output(GameContract.id, 1, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
+            output(GameContract.id, 1, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 1,
                     UniqueIdentifier(), listOf(casino, player)))
-            output(LockableTokenContract.id, 0, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 0, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(listOf(casino.owningKey, player.owningKey), Create(0))
@@ -246,15 +248,15 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
             val revealDeadline = Instant.now().plusSeconds(60)
-            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
-            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     UniqueIdentifier(), listOf(casino, player)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     revealDeadline, 0, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 0, playerId))
-            output(LockableTokenContract.id, 0, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 0, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(listOf(casino.owningKey, player.owningKey), Create(0))
@@ -273,13 +275,13 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
             val revealDeadline = Instant.now().plusSeconds(60)
-            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     revealDeadline, 4, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 4, playerId))
             output(LockableTokenContract.id, 4, LockableTokenState(issuer,
-                    Amount(11L, LockableTokenType), listOf(player, casino)))
+                    Amount(200L, LockableTokenType), listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))
             command(player.owningKey, Commit(1))
@@ -287,13 +289,13 @@ class CommitContractCommitTests {
             command(listOf(casino.owningKey, player.owningKey), Create(4))
 
             tweak {
-                output(GameContract.id, 2, GameState(casino commitsTo UniqueIdentifier() with (10L issuedBy issuer),
+                output(GameContract.id, 2, GameState(casino commitsTo UniqueIdentifier() with (199L issuedBy issuer),
                         player commitsTo playerId with (1L issuedBy issuer), 2,
                         UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game commit ids must all loop back")
             }
 
-            output(GameContract.id, 2, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 2, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 2,
                     UniqueIdentifier(), listOf(casino, player)))
             verifies()
@@ -307,15 +309,15 @@ class CommitContractCommitTests {
             val casinoId = UniqueIdentifier()
             val playerId = UniqueIdentifier()
             val revealDeadline = Instant.now().plusSeconds(60)
-            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
+            input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
                     revealDeadline, 2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
                     revealDeadline, 2, playerId))
-            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+            output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                     player commitsTo playerId with (1L issuedBy issuer), 3,
                     UniqueIdentifier(), listOf(casino, player)))
-            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+            output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
             command(casino.owningKey, Commit(0))

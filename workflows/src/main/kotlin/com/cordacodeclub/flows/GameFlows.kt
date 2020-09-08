@@ -40,7 +40,7 @@ object GameFlows {
         val casinoBettor
             get() = Bettor(casino, issuer, casinoWager)
         val casinoWager
-            get() = Math.multiplyExact(playerWager, GameParameters.casinoToPlayerRatio)
+            get() = Math.multiplyExact(playerWager, GameState.maxPayoutRatio)
         val totalBetted
             get() = Math.addExact(playerWager, casinoWager)
 
@@ -48,7 +48,7 @@ object GameFlows {
                 player commitsTo commitId with (playerWager issuedBy issuer)
 
         fun casinoCommittedBettor(commitId: UniqueIdentifier) =
-                casino commitsTo commitId with (Math.multiplyExact(playerWager, GameParameters.casinoToPlayerRatio) issuedBy issuer)
+                casino commitsTo commitId with (casinoWager issuedBy issuer)
     }
 
     @StartableByRPC

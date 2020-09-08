@@ -56,14 +56,14 @@ class CommitStatesTests {
                 .groupBy { it }
                 .mapValues { it.value.size }
         println(distribution)
-        assertContains(IntRange(250, 350), distribution[1_000L])
-        assertContains(IntRange(1_400, 1_600), distribution[250L])
-        assertContains(IntRange(3_000, 4_000), distribution[100L])
-        assertContains(IntRange(4_000, 5_000), distribution[75L])
-        assertContains(IntRange(5_000, 6_000), distribution[65L])
-        assertContains(IntRange(7_500, 8_500), distribution[60L])
-        assertContains(IntRange(9_500, 10_500), distribution[50L])
-        assertContains(IntRange(85_000, 95_000), distribution[20L])
+        assertContains(IntRange(250, 350), distribution[200L])
+        assertContains(IntRange(1_400, 1_600), distribution[50L])
+        assertContains(IntRange(3_000, 4_000), distribution[20L])
+        assertContains(IntRange(4_000, 5_000), distribution[15L])
+        assertContains(IntRange(5_000, 6_000), distribution[13L])
+        assertContains(IntRange(7_500, 8_500), distribution[12L])
+        assertContains(IntRange(9_500, 10_500), distribution[10L])
+        assertContains(IntRange(85_000, 95_000), distribution[4L])
         assertContains(IntRange(850_000, 900_000), distribution[0L])
     }
 }

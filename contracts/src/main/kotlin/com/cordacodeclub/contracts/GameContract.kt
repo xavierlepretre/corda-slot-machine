@@ -1,9 +1,6 @@
 package com.cordacodeclub.contracts
 
-import com.cordacodeclub.states.CommittedState
-import com.cordacodeclub.states.GameState
-import com.cordacodeclub.states.LockableTokenState
-import com.cordacodeclub.states.RevealedState
+import com.cordacodeclub.states.*
 import net.corda.core.contracts.*
 import net.corda.core.contracts.Requirements.using
 import net.corda.core.internal.toMultiMap
@@ -121,6 +118,30 @@ class GameContract : Contract {
                                 && tx.inRef<RevealedState>(revealIndex).state.contract == CommitContract.id
                     } ?: false
                 }
+        val (casinoImage, playerImage) = listOf(gameState.casino, gameState.player)
+                .map { it.committer.linearId }
+                .mapNotNull { inputIds[it]?.second as? RevealedState }
+                .map { it.image }
+        val expectedPlayerPayout = CommitImage.playerPayoutCalculator(casinoImage, playerImage)
+        val actualCasinoPayout = tx.outputStates
+                .filterIsInstance<LockableTokenState>()
+                .filter { it.holder == gameState.casino.committer.holder && it.issuer == gameState.tokenIssuer }
+                .takeIf { it.isNotEmpty() }
+                ?.reduce(LockableTokenState::plus)
+                ?.amount
+                ?.quantity
+                ?: 0L
+        val actualPlayerPayout = tx.outputStates
+                .filterIsInstance<LockableTokenState>()
+                .filter { it.holder == gameState.player.committer.holder && it.issuer == gameState.tokenIssuer }
+                .takeIf { it.isNotEmpty() }
+                ?.reduce(LockableTokenState::plus)
+                ?.amount
+                ?.quantity
+                ?: 0L
+        "The player payout should be correct" using (actualPlayerPayout == expectedPlayerPayout)
+        "The casino payout should be correct" using
+                (actualCasinoPayout == (gameState.bettedAmount.quantity - expectedPlayerPayout))
         return tx.inRef(resolve.inputIndex)
     }
 

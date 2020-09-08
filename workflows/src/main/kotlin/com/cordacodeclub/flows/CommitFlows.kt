@@ -84,7 +84,7 @@ object CommitFlows {
             val casinoChange = casinoTokens
                     .map { it.state.data.amount }
                     .reduce(Amount<LockableTokenType>::plus)
-                    .minus(Amount(Math.multiplyExact(playerWager, GameParameters.casinoToPlayerRatio), LockableTokenType))
+                    .minus(Amount(setup.casinoWager, LockableTokenType))
             val currentInputCount = builder.inputStates().size
             val currentOutputCount = builder.outputStates().size
             val casinoTokenInputIndices = casinoTokens.mapIndexed { index, state ->
@@ -132,8 +132,7 @@ object CommitFlows {
             val casinoChange = casinoTokens
                     .map { it.state.data.amount }
                     .reduce(Amount<LockableTokenType>::plus)
-                    .minus(Amount(Math.multiplyExact(setup.playerWager, GameParameters.casinoToPlayerRatio),
-                            LockableTokenType))
+                    .minus(Amount(setup.casinoWager, LockableTokenType))
             val fullySignedTx = subFlow(object : SignTransactionFlow(playerSession) {
 
                 override fun checkTransaction(stx: SignedTransaction) {
@@ -180,8 +179,7 @@ object CommitFlows {
                         throw FlowException("The game casino should be the expected casino")
                     if (gameState.casino.issuedAmount.issuer != setup.issuer)
                         throw FlowException("The game casino issuer should be the expected issuer")
-                    if (gameState.casino.issuedAmount.amount.quantity !=
-                            Math.multiplyExact(gameState.player.issuedAmount.amount.quantity, GameParameters.casinoToPlayerRatio))
+                    if (gameState.casino.issuedAmount.amount.quantity != setup.casinoWager)
                         throw FlowException("The casino amount should be the expected ratio with the player amount")
 
                     val myLockCommand = myCommands
@@ -213,8 +211,6 @@ object CommitFlows {
                         if (myChange.single().amount != casinoChange)
                             throw FlowException("Casino change is not the expected amount")
                     }
-
-                    // TODO Adds checks on the other commit state, as per the game state?
                 }
             })
 

@@ -21,11 +21,18 @@ data class GameState(
         override val linearId: UniqueIdentifier,
         override val participants: List<AbstractParty>) : LinearState {
 
+    companion object {
+        const val maxPayoutRatio = 200L - 1L
+    }
+
     init {
         require(participants.isNotEmpty()) { "There must be participants" }
         require(casino.issuedAmount.issuer == player.issuedAmount.issuer) { "The issuers must be the same" }
         require(casino.committer.holder != player.committer.holder) { "The holders must be different" }
         require(0 <= lockedWagersOutputIndex) { "Locked wager output index must be positive" }
+        require(casino.issuedAmount.amount == player.issuedAmount.amount.times(maxPayoutRatio)) {
+            "The casino and player wagers need to be proportional to maxPayoutRatio"
+        }
     }
 
     val tokenIssuer

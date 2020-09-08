@@ -17,6 +17,7 @@ import net.corda.testing.node.MockServices
 import net.corda.testing.node.ledger
 import org.junit.Ignore
 import org.junit.Test
+import java.math.BigInteger
 import java.time.Instant
 import java.util.*
 
@@ -27,7 +28,7 @@ class GameContractResolveTests {
             cordappPackages = listOf("com.cordacodeclub.contracts", "net.corda.testing.contracts"),
             firstIdentity = notaryId,
             networkParameters = testNetworkParameters().copy(minimumPlatformVersion = 4))
-    private val issuerId = TestIdentity(CordaX500Name("Issuer", "Ansterdam", "NL"))
+    private val issuerId = TestIdentity(CordaX500Name("Issuer", "Amsterdam", "NL"))
     private val issuer = issuerId.identity.party
     private val casinoId = TestIdentity(CordaX500Name("Casino", "London", "GB"))
     private val casino = casinoId.identity.party
@@ -40,21 +41,23 @@ class GameContractResolveTests {
         val casinoId = UniqueIdentifier()
         val playerId = UniqueIdentifier()
         val revealDeadline = Instant.now().plusSeconds(60)
-        input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(12L, LockableTokenType)))
+        input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(199L, LockableTokenType)))
+        input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(2L, LockableTokenType)))
         output(CommitContract.id, CommittedState(casinoHash, casino,
                 revealDeadline, 2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
                 revealDeadline, 2, playerId))
-        output(GameContract.id, 3, GameState(casino commitsTo casinoId with (10L issuedBy issuer),
+        output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
                 player commitsTo playerId with (1L issuedBy issuer), 3,
                 UniqueIdentifier(), listOf(casino, player)))
-        output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(11L, LockableTokenType),
+        output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                 listOf(casino, player)))
         output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
         command(casino.owningKey, Commit(0))
         command(player.owningKey, Commit(1))
         command(listOf(casino.owningKey, player.owningKey), Create(2))
-        command(player.owningKey, LockableTokenContract.Commands.Lock(listOf(0), listOf(3, 4)))
+        command(listOf(casino.owningKey, player.owningKey),
+                LockableTokenContract.Commands.Lock(listOf(0, 1), listOf(3, 4)))
         verifies()
     }
 
@@ -72,8 +75,8 @@ class GameContractResolveTests {
 
     @Test
     fun `Resolve command needs a Game state input`() {
-        val casinoImage = CommitImage.createRandom(random)
-        val playerImage = CommitImage.createRandom(random)
+        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+        val playerImage = CommitImage(BigInteger.valueOf(12L)) // -> 0 payout
         ledgerServices.ledger {
             val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
             val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
@@ -87,7 +90,7 @@ class GameContractResolveTests {
                 command(player.owningKey, Use(0))
                 command(player.owningKey, Use(1))
                 input(lockedRef.ref)
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(2), listOf(0)))
                 input(gameRef.ref)
 
@@ -105,8 +108,8 @@ class GameContractResolveTests {
     @Test
     @Ignore("How to circumvent the encumbrance check?")
     fun `Resolve must have reveals at the id`() {
-        val casinoImage = CommitImage.createRandom(random)
-        val playerImage = CommitImage.createRandom(random)
+        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+        val playerImage = CommitImage(BigInteger.valueOf(12L)) // -> 0 payout
         ledgerServices.ledger {
             val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
             val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
@@ -115,7 +118,7 @@ class GameContractResolveTests {
             val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
             transaction {
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(1), listOf(0)))
                 command(player.owningKey, Resolve(0))
                 command(player.owningKey, Use(2))
@@ -145,8 +148,8 @@ class GameContractResolveTests {
 
     @Test
     fun `Resolved game must have reveals that point to it`() {
-        val casinoImage = CommitImage.createRandom(random)
-        val playerImage = CommitImage.createRandom(random)
+        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+        val playerImage = CommitImage(BigInteger.valueOf(12L)) // -> 0 payout
         ledgerServices.ledger {
             val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
             val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
@@ -158,7 +161,7 @@ class GameContractResolveTests {
                 input(gameRef.ref)
                 command(player.owningKey, Resolve(0))
                 input(lockedRef.ref)
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(1), listOf(0)))
                 input(casinoRevealRef.ref)
                 command(player.owningKey, Use(2))
@@ -177,9 +180,117 @@ class GameContractResolveTests {
     }
 
     @Test
+    fun `Resolved game must have the correct payout - intermediate`() {
+        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+        val playerImage = CommitImage(BigInteger.valueOf(34L)) // -> 10 payout
+        ledgerServices.ledger {
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
+            val (gameRef) = issueTx.outRefsOfType<GameState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            transaction {
+                input(gameRef.ref)
+                command(player.owningKey, Resolve(0))
+                input(lockedRef.ref)
+                command(player.owningKey, Release(listOf(1), listOf(0, 1)))
+                input(casinoRevealRef.ref)
+                input(playerRevealRef.ref)
+                command(player.owningKey, Use(2))
+                command(player.owningKey, Use(3))
+
+                tweak {
+                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(191L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(9L, LockableTokenType)))
+                    failsWith("The player payout should be correct")
+                }
+
+                tweak {
+                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(189L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(11L, LockableTokenType)))
+                    failsWith("The player payout should be correct")
+                }
+
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(190L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(10L, LockableTokenType)))
+                verifies()
+            }
+        }
+    }
+
+    @Test
+    fun `Resolved game must have the correct payout - player loses`() {
+        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+        val playerImage = CommitImage(BigInteger.valueOf(12L)) // -> 50 payout
+        ledgerServices.ledger {
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
+            val (gameRef) = issueTx.outRefsOfType<GameState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            transaction {
+                input(gameRef.ref)
+                command(player.owningKey, Resolve(0))
+                input(lockedRef.ref)
+                input(casinoRevealRef.ref)
+                input(playerRevealRef.ref)
+                command(player.owningKey, Use(2))
+                command(player.owningKey, Use(3))
+
+                tweak {
+                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(199L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
+                    command(player.owningKey, Release(listOf(1), listOf(0, 1)))
+                    failsWith("The player payout should be correct")
+                }
+
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
+                command(player.owningKey, Release(listOf(1), listOf(0)))
+                verifies()
+            }
+        }
+    }
+
+    @Test
+    fun `Resolved game must have the correct payout - player wins all`() {
+        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+        val playerImage = CommitImage(BigInteger.valueOf(3_071L)) // -> 200 payout
+        ledgerServices.ledger {
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
+            val (gameRef) = issueTx.outRefsOfType<GameState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            transaction {
+                input(gameRef.ref)
+                command(player.owningKey, Resolve(0))
+                input(lockedRef.ref)
+                input(casinoRevealRef.ref)
+                input(playerRevealRef.ref)
+                command(player.owningKey, Use(2))
+                command(player.owningKey, Use(3))
+
+                tweak {
+                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(1L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(199L, LockableTokenType)))
+                    command(player.owningKey, Release(listOf(1), listOf(0, 1)))
+                    failsWith("The player payout should be correct")
+                }
+
+                output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(200L, LockableTokenType)))
+                command(player.owningKey, Release(listOf(1), listOf(0)))
+                verifies()
+            }
+        }
+    }
+
+    @Test
     fun `All input game states must be covered by a command`() {
-        val casinoImage = CommitImage.createRandom(random)
-        val playerImage = CommitImage.createRandom(random)
+        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+        val playerImage = CommitImage(BigInteger.valueOf(12L)) // -> 0 payout
         ledgerServices.ledger {
             val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
             val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
@@ -194,7 +305,7 @@ class GameContractResolveTests {
                 input(gameRef.ref)
                 command(player.owningKey, Resolve(0))
                 input(lockedRef.ref)
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(11L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(1), listOf(0)))
                 input(casinoRevealRef.ref)
                 input(playerRevealRef.ref)

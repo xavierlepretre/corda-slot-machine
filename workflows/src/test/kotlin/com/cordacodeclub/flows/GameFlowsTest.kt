@@ -1,5 +1,6 @@
 package com.cordacodeclub.flows
 
+import com.cordacodeclub.states.GameState
 import com.cordacodeclub.states.LockableTokenState
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount
 import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
@@ -110,18 +111,18 @@ class GameFlowsTest {
 
     @Test
     fun `can launch the game along the happy path without change`() {
-        issueToken(issuerNode, casino1, issuer, GameParameters.casinoToPlayerRatio)
-        issueToken(issuerNode, player1, issuer, 1L)
-        playerNode.startFlow(GameFlows.Initiator(player1, 1L, issuer, casino1))
+        issueToken(issuerNode, casino1, issuer, GameState.maxPayoutRatio * 3L)
+        issueToken(issuerNode, player1, issuer, 3L)
+        playerNode.startFlow(GameFlows.Initiator(player1, 3L, issuer, casino1))
                 .also { network.runNetwork() }
                 .get()
     }
 
     @Test
     fun `can launch the game along the happy path with change`() {
-        issueToken(issuerNode, casino1, issuer, GameParameters.casinoToPlayerRatio + 2L)
-        issueToken(issuerNode, player1, issuer, 2L)
-        playerNode.startFlow(GameFlows.Initiator(player1, 1L, issuer, casino1))
+        issueToken(issuerNode, casino1, issuer, GameState.maxPayoutRatio * 4L + 2L)
+        issueToken(issuerNode, player1, issuer, 9L)
+        playerNode.startFlow(GameFlows.Initiator(player1, 4L, issuer, casino1))
                 .also { network.runNetwork() }
                 .get()
     }
