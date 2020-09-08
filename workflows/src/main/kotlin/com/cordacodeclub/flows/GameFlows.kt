@@ -125,6 +125,7 @@ object GameFlows {
             // Inform casino of player
             subFlow(SyncKeyMappingFlow(casinoSession, listOf(player)))
             // Inform casino of new game
+            subFlow(SyncKeyMappingFlow(casinoSession, listOf(player)))
             val setup = GameSetup(player = player,
                     playerWager = playerWager,
                     issuer = issuer,
@@ -172,6 +173,7 @@ object GameFlows {
             // Receive player information
             subFlow(SyncKeyMappingFlowHandler(playerSession))
             // Receive new game information
+            subFlow(SyncKeyMappingFlowHandler(playerSession))
             val setup = playerSession.receive<GameSetup>().unwrap { it }
             val (player, playerWager, issuer, casino, commitDeadline,
                     revealDeadline) = setup

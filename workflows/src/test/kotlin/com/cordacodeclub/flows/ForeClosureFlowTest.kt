@@ -1,11 +1,13 @@
 package com.cordacodeclub.flows
 
+import com.cordacodeclub.states.GameState
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount
 import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingInitiator
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.node.services.queryBy
 import net.corda.testing.common.internal.testNetworkParameters
 import net.corda.testing.node.MockNetwork
 import net.corda.testing.node.MockNetworkParameters
@@ -89,9 +91,14 @@ class ForeClosureFlowTest {
     }
 
     @Test
-    fun `can launch the game along the happy path without change`() {
+    fun `can run foreclosure flow with incomplete game flow`() {
         playerNode.startFlow(GameFlows.Initiator(player1, casino1))
-                .also { network.runNetwork() }
-                .get()
+        network.runNetwork()
+
+        val gameState = playerNode.services.vaultService.queryBy<GameState>().states.single()
+        val flow = playerNode.startFlow(ForeClosureFlow.Initiator(gameState, playerNode.info.legalIdentities.last().name))
+        network.runNetwork()
+        flow.get()
+
     }
 }
