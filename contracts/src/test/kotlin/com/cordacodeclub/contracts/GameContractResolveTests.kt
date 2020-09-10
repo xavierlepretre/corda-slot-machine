@@ -41,16 +41,16 @@ class GameContractResolveTests {
         val casinoId = UniqueIdentifier()
         val playerId = UniqueIdentifier()
         val revealDeadline = Instant.now().plusSeconds(60)
-        input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(199L, LockableTokenType)))
-        input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(2L, LockableTokenType)))
+        input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
+        input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(3L, LockableTokenType)))
         output(CommitContract.id, CommittedState(casinoHash, casino,
                 revealDeadline, 2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
                 revealDeadline, 2, playerId))
-        output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                player commitsTo playerId with (1L issuedBy issuer), 3,
+        output(GameContract.id, 3, GameState(casino commitsTo casinoId with (398L issuedBy issuer),
+                player commitsTo playerId with (2L issuedBy issuer), 3,
                 UniqueIdentifier(), listOf(casino, player)))
-        output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(200L, LockableTokenType),
+        output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(400L, LockableTokenType),
                 listOf(casino, player)))
         output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
         command(casino.owningKey, Commit(0))
@@ -90,7 +90,7 @@ class GameContractResolveTests {
                 command(player.owningKey, Use(0))
                 command(player.owningKey, Use(1))
                 input(lockedRef.ref)
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(400L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(2), listOf(0)))
                 input(gameRef.ref)
 
@@ -118,7 +118,7 @@ class GameContractResolveTests {
             val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
             val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
             transaction {
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(400L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(1), listOf(0)))
                 command(player.owningKey, Resolve(0))
                 command(player.owningKey, Use(2))
@@ -161,7 +161,7 @@ class GameContractResolveTests {
                 input(gameRef.ref)
                 command(player.owningKey, Resolve(0))
                 input(lockedRef.ref)
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(400L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(1), listOf(0)))
                 input(casinoRevealRef.ref)
                 command(player.owningKey, Use(2))
@@ -201,19 +201,19 @@ class GameContractResolveTests {
                 command(player.owningKey, Use(3))
 
                 tweak {
-                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(191L, LockableTokenType)))
-                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(9L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(382L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(18L, LockableTokenType)))
                     failsWith("The player payout should be correct")
                 }
 
                 tweak {
-                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(189L, LockableTokenType)))
-                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(11L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(378L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(22L, LockableTokenType)))
                     failsWith("The player payout should be correct")
                 }
 
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(190L, LockableTokenType)))
-                output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(10L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(380L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(20L, LockableTokenType)))
                 verifies()
             }
         }
@@ -240,13 +240,13 @@ class GameContractResolveTests {
                 command(player.owningKey, Use(3))
 
                 tweak {
-                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(199L, LockableTokenType)))
-                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(2L, LockableTokenType)))
                     command(player.owningKey, Release(listOf(1), listOf(0, 1)))
                     failsWith("The player payout should be correct")
                 }
 
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(400L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(1), listOf(0)))
                 verifies()
             }
@@ -274,13 +274,13 @@ class GameContractResolveTests {
                 command(player.owningKey, Use(3))
 
                 tweak {
-                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(1L, LockableTokenType)))
-                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(199L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(2L, LockableTokenType)))
+                    output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(398L, LockableTokenType)))
                     command(player.owningKey, Release(listOf(1), listOf(0, 1)))
                     failsWith("The player payout should be correct")
                 }
 
-                output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(200L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(400L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(1), listOf(0)))
                 verifies()
             }
@@ -305,7 +305,7 @@ class GameContractResolveTests {
                 input(gameRef.ref)
                 command(player.owningKey, Resolve(0))
                 input(lockedRef.ref)
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(400L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(1), listOf(0)))
                 input(casinoRevealRef.ref)
                 input(playerRevealRef.ref)

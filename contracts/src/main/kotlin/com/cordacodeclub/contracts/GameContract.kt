@@ -122,7 +122,10 @@ class GameContract : Contract {
                 .map { it.committer.linearId }
                 .mapNotNull { inputIds[it]?.second as? RevealedState }
                 .map { it.image }
-        val expectedPlayerPayout = CommitImage.playerPayoutCalculator(casinoImage, playerImage)
+                .also { "There should be 2 images " using (it.size == 2) }
+        val expectedPlayerPayout = Math.multiplyExact(
+                gameState.player.issuedAmount.amount.quantity,
+                CommitImage.playerPayoutCalculator(casinoImage, playerImage))
         val actualCasinoPayout = tx.outputStates
                 .filterIsInstance<LockableTokenState>()
                 .filter { it.holder == gameState.casino.committer.holder && it.issuer == gameState.tokenIssuer }
