@@ -59,7 +59,7 @@ object GameFlows {
             val playerRevealTx: SignedTransaction,
             val resolveTx: SignedTransaction) {
 
-        val playerPayoutCalculator = CommitImage.playerPayoutCalculator(
+        val playerPayout = CommitImage.playerPayoutCalculator(
                 casinoRevealTx.tx.outputsOfType<RevealedState>().single().image,
                 playerRevealTx.tx.outputsOfType<RevealedState>().single().image)
     }
@@ -68,10 +68,10 @@ object GameFlows {
     class SimpleInitiator(val playerName: String,
                           val playerWager: Long,
                           val issuerName: CordaX500Name,
-                          val casinoName: CordaX500Name) : FlowLogic<Unit>() {
+                          val casinoName: CordaX500Name) : FlowLogic<GameResult>() {
 
         @Suspendable
-        override fun call() {
+        override fun call(): GameResult {
             val issuer = serviceHub.identityService.wellKnownPartyFromX500Name(issuerName)
                     ?: throw FlowException("Unknown issuer name $issuerName")
             val casino = serviceHub.identityService.wellKnownPartyFromX500Name(casinoName)
@@ -95,10 +95,13 @@ object GameFlows {
                         if (it.isNotEmpty()) AnonymousParty(it.first())
                         else serviceHub.createKeyForAccount(playerAccount)
                     }
-            subFlow(Initiator(player = player,
+            val playerPayout = subFlow(Initiator(player = player,
                     playerWager = playerWager,
                     issuer = issuer,
                     casino = casino))
+                    .playerPayout
+            val playerBalance = subFlow(LockableTokenFlows.Balance.Local(issuer, player))
+            return GameResult(playerPayout, playerBalance)
         }
     }
 
