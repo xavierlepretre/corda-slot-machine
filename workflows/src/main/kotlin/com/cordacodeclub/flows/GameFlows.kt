@@ -12,6 +12,7 @@ import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.AnonymousParty
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.serialization.CordaSerializable
+import net.corda.core.transactions.SignedTransaction
 import net.corda.core.utilities.unwrap
 import java.time.Instant
 import java.util.*
@@ -49,6 +50,18 @@ object GameFlows {
 
         fun casinoCommittedBettor(commitId: UniqueIdentifier) =
                 casino commitsTo commitId with (casinoWager issuedBy issuer)
+    }
+
+    @CordaSerializable
+    data class GameTransactions(
+            val commitTx: SignedTransaction,
+            val casinoRevealTx: SignedTransaction,
+            val playerRevealTx: SignedTransaction,
+            val resolveTx: SignedTransaction) {
+
+        val playerPayoutCalculator = CommitImage.playerPayoutCalculator(
+                casinoRevealTx.tx.outputsOfType<RevealedState>().single().image,
+                playerRevealTx.tx.outputsOfType<RevealedState>().single().image)
     }
 
     @StartableByRPC
@@ -98,10 +111,10 @@ object GameFlows {
     class Initiator(val player: AbstractParty,
                     val playerWager: Long,
                     val issuer: AbstractParty,
-                    val casino: AbstractParty) : FlowLogic<Unit>() {
+                    val casino: AbstractParty) : FlowLogic<GameTransactions>() {
 
         @Suspendable
-        override fun call() {
+        override fun call(): GameTransactions {
             val playerImage = CommitImage.createRandom(Random())
             val commitDeadline = Instant.now().plus(GameParameters.commitDuration)!!
             val revealDeadline = commitDeadline.plus(GameParameters.revealDuration)!!
@@ -140,20 +153,21 @@ object GameFlows {
             // Player responds to casino's reveal.
             val casinoRevealTx = subFlow(RevealFlows.Responder(casinoSession))
             val casinoRevealed = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
+            // Player now sends its own reveal transaction.
+            casinoSession.send(playerRevealTx)
 
             // Player initiates resolution.
             val useTx = subFlow(UseFlows.Initiator(
                     playerRevealedRef, casinoRevealed, gameRef, lockedTokenRef, casinoSession))
-
-            //TODO("Return the outcome for the RPC")
+            return GameTransactions(commitTx, casinoRevealTx, playerRevealTx, useTx)
         }
     }
 
     @InitiatedBy(Initiator::class)
-    class Responder(val playerSession: FlowSession) : FlowLogic<Unit>() {
+    class Responder(val playerSession: FlowSession) : FlowLogic<GameTransactions>() {
 
         @Suspendable
-        override fun call() {
+        override fun call(): GameTransactions {
             val casinoImage = CommitImage.createRandom(Random())
             // Receive player information
             subFlow(SyncKeyMappingFlowHandler(playerSession))
@@ -175,13 +189,17 @@ object GameFlows {
             val casinoCommitRef = commitTx.tx.outRefsOfType<CommittedState>()
                     .single { it.state.data.creator == casino }
 
-            // Casino does not receive any reveal from player, yet reveals and discloses.
+            // Casino does not yet receive any reveal from player, yet reveals and discloses.
             val casinoRevealTx = subFlow(RevealFlows.Initiator(casinoCommitRef, casinoImage,
                     revealDeadline, gameRef, listOf(casino, player), listOf(playerSession)))
             val casinoRevealedRef = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
+            // Casino receives player's reveal
+            val playerRevealTx = playerSession.receive<SignedTransaction>().unwrap { it }
 
             // Casino receives resolution.
             val useTx = subFlow(UseFlows.Responder(playerSession))
+
+            return GameTransactions(commitTx, casinoRevealTx, playerRevealTx, useTx)
         }
     }
 }
