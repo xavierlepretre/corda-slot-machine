@@ -16,14 +16,19 @@ import net.corda.core.node.services.vault.DEFAULT_PAGE_NUM
 import net.corda.core.node.services.vault.PageSpecification
 import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.node.services.vault.builder
+import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.toNonEmptySet
+import net.corda.core.utilities.unwrap
 import java.util.*
 
 object LockableTokenFlows {
 
     object Issue {
+
+        const val automaticAmount = 100L
+
         /**
          * Issues the amount of tokens to the given holders.
          * Its handler is [Responder].
@@ -73,6 +78,46 @@ object LockableTokenFlows {
 
             @Suspendable
             override fun call() = subFlow(ReceiveFinalityFlow(issuerSession))
+        }
+
+        @CordaSerializable
+        data class Request(val notary: Party,
+                           val holder: AbstractParty,
+                           val issuer: AbstractParty)
+
+        /**
+         * Asks the issuer to get some tokens.
+         * Its handler is [ResponderBeg].
+         */
+        @InitiatingFlow
+        @StartableByRPC
+        class InitiatorBeg(private val request: Request) : FlowLogic<SignedTransaction>() {
+
+            @Suspendable
+            override fun call(): SignedTransaction {
+                val issuerHost =
+                        serviceHub.identityService.wellKnownPartyFromAnonymous(request.issuer)
+                                ?: throw FlowException("Could not resolve issuer")
+                return if (issuerHost == ourIdentity)
+                    subFlow(Initiator(request.notary, request.holder, automaticAmount, request.issuer))
+                else {
+                    val issuerSession = initiateFlow(issuerHost)
+                    issuerSession.sendAndReceive<SignedTransaction>(request).unwrap { it }
+                }
+            }
+        }
+
+        @InitiatedBy(InitiatorBeg::class)
+        class ResponderBeg(private val holderSession: FlowSession) : FlowLogic<SignedTransaction>() {
+
+            @Suspendable
+            override fun call(): SignedTransaction = holderSession.receive<Request>()
+                    .unwrap {
+                        subFlow(Initiator(it.notary, it.holder, automaticAmount, it.issuer))
+                    }
+                    .also {
+                        holderSession.send(it)
+                    }
         }
     }
 
