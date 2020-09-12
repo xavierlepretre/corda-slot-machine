@@ -47,8 +47,7 @@ data class CommitImage(val picked: ByteArray) {
         const val requiredLength = 256
         const val bitsInByte = 8
 
-        fun createRandom(random: Random) = BigInteger(requiredLength, random)
-                .toByteArray()
+        fun BigInteger.toProperByteArray() = toByteArray()
                 .let {
                     // Funny things happen with extra 0s or missing 0s in high weight
                     when {
@@ -59,7 +58,37 @@ data class CommitImage(val picked: ByteArray) {
                         else -> it
                     }
                 }
-                .let { CommitImage(it) }
+
+        fun createRandom(random: Random) = CommitImage(
+                BigInteger(requiredLength, random).toProperByteArray())
+
+        /**
+         * @return A number that is to be understood as n out of 10,000.
+         */
+        fun playerPayoutCalculator(casinoImage: CommitImage, playerImage: CommitImage): Long {
+            // The first number is to be understood as out of 10,000.
+            // The second number is to be understood as out of 1,000.
+            val percentiles = listOf(
+                    3L to GameState.maxPayoutRatio + 1L, // [1, "default", 6, 6, 6, 0.0003, 200, 200],
+                    18L to 50L, // [2, "default", 4, 4, 4, 0.0015, 50, 50],
+                    53L to 20L, // [3, "default", 2, 2, 2, 0.0035, 20, 20],
+                    98L to 15L, // [4, "default", "1/3", "5/2", "4/6", 0.0045, 15, 15],
+                    153L to 13L, // [5, "default", 5, 5, 5, 0.0055, 13, 13],
+                    233L to 12L, // [6, "default", 1, 1, 1, 0.008, 12, 12],
+                    333L to 10L, // [7, "default", 3, 3, 3, 0.01, 10, 10],
+                    1_233L to 4L, // [8, "default", "1/3/5", "1/3/5", "1/3/5", 0.09, 4, 4],
+                    10_000L to 0L
+            )
+            val imageResult = BigInteger(SecureHash.sha256(casinoImage.picked + playerImage.picked).bytes)
+                    .mod(BigInteger.valueOf(10_000L))
+                    .longValueExact()
+            return (percentiles
+                    .firstOrNull {
+                        imageResult < it.first
+                    }
+                    ?: percentiles.last())
+                    .second
+        }
     }
 
     init {
@@ -67,6 +96,8 @@ data class CommitImage(val picked: ByteArray) {
             "There should be 256 bits"
         }
     }
+
+    constructor(bigInt: BigInteger) : this(bigInt.toProperByteArray())
 
     val hash: SecureHash by lazy { SecureHash.sha256(picked) }
 

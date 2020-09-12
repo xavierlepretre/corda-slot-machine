@@ -35,7 +35,7 @@ class CommitContract : Contract {
         }
 
         val coveredStates = tx.commandsOfType<Commands>()
-                .also { require (it.isNotEmpty()) { "The CommitContract must find at least 1 command" } }
+                .also { require(it.isNotEmpty()) { "The CommitContract must find at least 1 command" } }
                 .flatMap { command ->
                     when (command.value) {
                         is Commands.Commit ->
@@ -69,13 +69,15 @@ class CommitContract : Contract {
             "The game output must be at the right index" using
                     (tx.outputStates[committedState.gameOutputIndex] is GameState)
             val gameState = tx.outputStates[committedState.gameOutputIndex] as GameState
-            "The game commit ids must all loop back" using (gameState.commitIds.all {
-                outputIds[it]?.let {
-                    (it.single() as? CommittedState)?.let {
-                        it.gameOutputIndex == committedState.gameOutputIndex
-                    }
-                } ?: false
-            })
+            "The game commit ids must all loop back" using (listOf(gameState.casino, gameState.player)
+                    .map { it.committer.linearId }
+                    .all {
+                        outputIds[it]?.let {
+                            (it.single() as? CommittedState)?.let {
+                                it.gameOutputIndex == committedState.gameOutputIndex
+                            }
+                        } ?: false
+                    })
 
             "The creator must sign" using signers.contains(committedState.creator.owningKey)
 
@@ -124,7 +126,9 @@ class CommitContract : Contract {
             val game = tx.inputs
                     .single { it.ref == revealedState.game.pointer } as StateAndRef<GameState>
 
-            "All the game commit ids must be present" using (game.state.data.commitIds
+            "All the game commit ids must be present" using (game.state.data
+                    .let { listOf(it.casino, it.player) }
+                    .map { it.committer.linearId }
                     .all {
                         inputIds[it]?.let {
                             (it.single() as? RevealedState)?.let {

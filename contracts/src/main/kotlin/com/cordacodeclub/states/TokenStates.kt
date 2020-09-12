@@ -5,6 +5,7 @@ import com.cordacodeclub.schema.LockableTokenSchemaV1
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.BelongsToContract
 import net.corda.core.contracts.ContractState
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.AbstractParty
 import net.corda.core.schemas.MappedSchema
 import net.corda.core.schemas.PersistentState
@@ -19,21 +20,28 @@ class LockableTokenState private constructor(
         val holder: AbstractParty?,
         val isLocked: Boolean,
         val issuer: AbstractParty,
-        val amount: Amount<LockableTokenType>) : ContractState, QueryableState {
+        val amount: Amount<LockableTokenType>,
+        override val participants: List<AbstractParty>) : ContractState, QueryableState {
 
     init {
         require(isLocked == (holder == null)) { "Is locked should reflect that holder is null" }
     }
 
-    constructor(issuer: AbstractParty, amount: Amount<LockableTokenType>)
-            : this(null, true, issuer, amount)
+    constructor(issuer: AbstractParty, amount: Amount<LockableTokenType>, participants: List<AbstractParty>)
+            : this(null, true, issuer, amount, participants)
 
     constructor(holder: AbstractParty, issuer: AbstractParty, amount: Amount<LockableTokenType>)
-            : this(holder, false, issuer, amount)
+            : this(holder, false, issuer, amount, listOf(holder))
 
-    override val participants = listOfNotNull(holder)
-            .takeIf { it.isNotEmpty() }
-            ?: listOf(issuer)
+    constructor(bettor: Bettor) : this(bettor.holder, bettor.issuedAmount.issuer, bettor.issuedAmount.amount)
+
+    fun plus(other: LockableTokenState): LockableTokenState {
+        require(isLocked == other.isLocked) { "Both locked statuses must be equal" }
+        require(issuer == other.issuer) { "Both issuers must be equal" }
+        require(holder == other.holder) { "If unlocked both holders must be equal" }
+        return if (!isLocked) LockableTokenState(holder!!, issuer, amount.plus(other.amount))
+        else LockableTokenState(issuer, amount.plus(other.amount), participants.plus(other.participants).distinct())
+    }
 
     override fun generateMappedObject(schema: MappedSchema): PersistentState {
         return when (schema) {
@@ -68,3 +76,35 @@ class LockableTokenState private constructor(
         return result
     }
 }
+
+@CordaSerializable
+data class IssuedAmount(val issuer: AbstractParty,
+                        val amount: Amount<LockableTokenType>) {
+    constructor(issuer: AbstractParty,
+                amount: Long) : this(issuer, Amount(amount, LockableTokenType))
+}
+
+infix fun Long.issuedBy(issuer: AbstractParty) = IssuedAmount(issuer, this)
+infix fun Amount<LockableTokenType>.issuedBy(issuer: AbstractParty) = IssuedAmount(issuer, this)
+
+@CordaSerializable
+data class Bettor(val holder: AbstractParty,
+                  val issuedAmount: IssuedAmount) {
+    constructor(holder: AbstractParty,
+                issuer: AbstractParty,
+                amount: Long) : this(holder, amount issuedBy issuer)
+}
+
+infix fun IssuedAmount.heldBy(holder: AbstractParty) = Bettor(holder, this)
+
+@CordaSerializable
+data class Committer(val holder: AbstractParty,
+                     val linearId: UniqueIdentifier)
+
+infix fun AbstractParty.commitsTo(linearId: UniqueIdentifier) = Committer(this, linearId)
+
+@CordaSerializable
+data class CommittedBettor(val committer: Committer,
+                           val issuedAmount: IssuedAmount)
+
+infix fun Committer.with(issuedAmount: IssuedAmount) = CommittedBettor(this, issuedAmount)

@@ -1,19 +1,19 @@
 package com.cordacodeclub.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.cordacodeclub.states.CommitImage
-import com.cordacodeclub.states.CommittedState
-import com.cordacodeclub.states.GameState
-import com.cordacodeclub.states.RevealedState
+import com.cordacodeclub.states.*
 import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
 import com.r3.corda.lib.accounts.workflows.services.AccountService
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlow
+import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlowHandler
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.*
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.AnonymousParty
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.serialization.CordaSerializable
+import net.corda.core.transactions.SignedTransaction
 import net.corda.core.utilities.unwrap
-import java.time.Duration
 import java.time.Instant
 import java.util.*
 
@@ -22,34 +22,65 @@ import java.util.*
  */
 object GameFlows {
 
-    val commitDuration = Duration.ofMinutes(2)!!
-    val revealDuration = Duration.ofMinutes(2)!!
-
     /**
      * Data transport class to inform the remote note in 1 send.
      */
     @CordaSerializable
     data class GameSetup(val player: AbstractParty,
+                         val playerWager: Long,
+                         val issuer: AbstractParty,
                          val casino: AbstractParty,
                          val commitDeadline: Instant,
                          val revealDeadline: Instant) {
         init {
             require(commitDeadline < revealDeadline) { "The commit deadline must come before the reveal one" }
         }
+
+        val playerBettor
+            get() = Bettor(player, issuer, playerWager)
+        val casinoBettor
+            get() = Bettor(casino, issuer, casinoWager)
+        val casinoWager
+            get() = Math.multiplyExact(playerWager, GameState.maxPayoutRatio)
+        val totalBetted
+            get() = Math.addExact(playerWager, casinoWager)
+
+        fun playerCommittedBettor(commitId: UniqueIdentifier) =
+                player commitsTo commitId with (playerWager issuedBy issuer)
+
+        fun casinoCommittedBettor(commitId: UniqueIdentifier) =
+                casino commitsTo commitId with (casinoWager issuedBy issuer)
+    }
+
+    @CordaSerializable
+    data class GameTransactions(
+            val commitTx: SignedTransaction,
+            val casinoRevealTx: SignedTransaction,
+            val playerRevealTx: SignedTransaction,
+            val resolveTx: SignedTransaction) {
+
+        val playerPayoutCalculator = CommitImage.playerPayoutCalculator(
+                casinoRevealTx.tx.outputsOfType<RevealedState>().single().image,
+                playerRevealTx.tx.outputsOfType<RevealedState>().single().image)
     }
 
     @StartableByRPC
-    class SimpleInitiator(val playerName: String, val casinoName: CordaX500Name) : FlowLogic<Unit>() {
+    class SimpleInitiator(val playerName: String,
+                          val playerWager: Long,
+                          val issuerName: CordaX500Name,
+                          val casinoName: CordaX500Name) : FlowLogic<Unit>() {
 
         @Suspendable
         override fun call() {
+            val issuer = serviceHub.identityService.wellKnownPartyFromX500Name(issuerName)
+                    ?: throw FlowException("Unknown issuer name $issuerName")
             val casino = serviceHub.identityService.wellKnownPartyFromX500Name(casinoName)
                     ?: throw FlowException("Unknown casino name $casinoName")
             val accountService = serviceHub.cordaService(AccountService::class.java)
             val playerAccount = accountService
                     .accountInfo(playerName)
                     .let {
-                        if (it.size == 0)
+                        if (it.isEmpty())
                             throw FlowException("No player with this name $playerName")
                         else if (1 < it.size)
                             throw FlowException("More than 1 player found with this name $playerName")
@@ -61,10 +92,13 @@ object GameFlows {
             val player = serviceHub.identityService.publicKeysForExternalId(playerAccount.identifier.id)
                     .toList()
                     .let {
-                        if (1 <= it.size) AnonymousParty(it.first())
+                        if (it.isNotEmpty()) AnonymousParty(it.first())
                         else serviceHub.createKeyForAccount(playerAccount)
                     }
-            subFlow(Initiator(player, casino))
+            subFlow(Initiator(player = player,
+                    playerWager = playerWager,
+                    issuer = issuer,
+                    casino = casino))
         }
     }
 
@@ -74,27 +108,43 @@ object GameFlows {
      */
     @InitiatingFlow
     @StartableByRPC
-    class Initiator(val player: AbstractParty, val casino: AbstractParty) : FlowLogic<Unit>() {
+    class Initiator(val player: AbstractParty,
+                    val playerWager: Long,
+                    val issuer: AbstractParty,
+                    val casino: AbstractParty) : FlowLogic<GameTransactions>() {
 
         @Suspendable
-        override fun call() {
+        override fun call(): GameTransactions {
             val playerImage = CommitImage.createRandom(Random())
-            val commitDeadline = Instant.now().plus(commitDuration)!!
-            val revealDeadline = commitDeadline.plus(revealDuration)!!
+            val commitDeadline = Instant.now().plus(GameParameters.commitDuration)!!
+            val revealDeadline = commitDeadline.plus(GameParameters.revealDuration)!!
             val casinoHost = serviceHub.identityService.wellKnownPartyFromAnonymous(casino)
                     ?: throw FlowException("Cannot resolve the casino host")
             if (casinoHost == ourIdentity) throw FlowException("You must play with a remote host, not yourself")
             val casinoSession = initiateFlow(casinoHost)
+            // Inform casino of player
+            subFlow(SyncKeyMappingFlow(casinoSession, listOf(player)))
             // Inform casino of new game
-            val setup = GameSetup(player, casino, commitDeadline, revealDeadline)
+            val setup = GameSetup(player = player,
+                    playerWager = playerWager,
+                    issuer = issuer,
+                    casino = casino,
+                    commitDeadline = commitDeadline,
+                    revealDeadline = revealDeadline)
             casinoSession.send(setup)
             // First notary, not caring much...
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
-            // Player asks casino for commit and prepares double commits
-            val commitTx = subFlow(CommitFlows.Initiator(notary, playerImage.hash, setup, casinoSession))
+            // Player collects enough tokens for the wager.
+            val playerTokens = subFlow(LockableTokenFlows.Fetch.Local(player, issuer,
+                    playerWager, currentTopLevel?.runId?.uuid ?: throw FlowException("No running id")))
+            // Player asks casino for commit and prepares double commits.
+            val commitTx = subFlow(CommitFlows.Initiator(notary, playerImage.hash, setup, playerTokens,
+                    casinoSession))
             val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
             val playerCommitRef = commitTx.tx.outRefsOfType<CommittedState>()
                     .single { it.state.data.creator == player }
+            val lockedTokenRef = commitTx.tx.outRefsOfType<LockableTokenState>()
+                    .single { it.state.data.isLocked }
 
             // Player reveals secretly.
             val playerRevealTx = subFlow(RevealFlows.Initiator(
@@ -103,42 +153,53 @@ object GameFlows {
             // Player responds to casino's reveal.
             val casinoRevealTx = subFlow(RevealFlows.Responder(casinoSession))
             val casinoRevealed = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
+            // Player now sends its own reveal transaction.
+            casinoSession.send(playerRevealTx)
 
             // Player initiates resolution.
             val useTx = subFlow(UseFlows.Initiator(
-                    playerRevealedRef, casinoRevealed, gameRef, casinoSession))
-
-            TODO("Return the outcome for the RPC")
+                    playerRevealedRef, casinoRevealed, gameRef, lockedTokenRef, casinoSession))
+            return GameTransactions(commitTx, casinoRevealTx, playerRevealTx, useTx)
         }
     }
 
     @InitiatedBy(Initiator::class)
-    class Responder(val playerSession: FlowSession) : FlowLogic<Unit>() {
+    class Responder(val playerSession: FlowSession) : FlowLogic<GameTransactions>() {
 
         @Suspendable
-        override fun call() {
+        override fun call(): GameTransactions {
             val casinoImage = CommitImage.createRandom(Random())
+            // Receive player information
+            subFlow(SyncKeyMappingFlowHandler(playerSession))
             // Receive new game information
-            val (player, casino, commitDeadline, revealDeadline) =
-                    playerSession.receive<GameSetup>().unwrap { it }
-            if (Instant.now().plus(revealDuration) < commitDeadline.plus(Duration.ofMinutes(1)))
+            val setup = playerSession.receive<GameSetup>().unwrap { it }
+            val (player, playerWager, issuer, casino, commitDeadline,
+                    revealDeadline) = setup
+            if (Instant.now().plus(GameParameters.commitDuration) < commitDeadline)
                 throw FlowException("Commit deadline is too far in the future")
-            if (commitDeadline.plus(revealDuration) != revealDeadline)
+            if (commitDeadline.plus(GameParameters.revealDuration) != revealDeadline)
                 throw FlowException("Reveal deadline is incorrect")
+            // Casino collects enough tokens for the wager.
+            val casinoTokens = subFlow(LockableTokenFlows.Fetch.Local(casino, issuer,
+                    setup.casinoWager, currentTopLevel?.runId?.uuid ?: throw FlowException("No running id")))
             // Casino gives commit info and gets both commits tx.
             val commitTx = subFlow(CommitFlows.Responder(
-                    playerSession, commitDeadline, revealDeadline, casinoImage.hash, casino))
+                    playerSession, setup, casinoImage.hash, casinoTokens))
             val gameRef = commitTx.tx.outRefsOfType<GameState>().single()
             val casinoCommitRef = commitTx.tx.outRefsOfType<CommittedState>()
                     .single { it.state.data.creator == casino }
 
-            // Casino does not receive any reveal from player, yet reveals and discloses.
+            // Casino does not yet receive any reveal from player, yet reveals and discloses.
             val casinoRevealTx = subFlow(RevealFlows.Initiator(casinoCommitRef, casinoImage,
                     revealDeadline, gameRef, listOf(casino, player), listOf(playerSession)))
             val casinoRevealedRef = casinoRevealTx.tx.outRefsOfType<RevealedState>().single()
+            // Casino receives player's reveal
+            val playerRevealTx = playerSession.receive<SignedTransaction>().unwrap { it }
 
             // Casino receives resolution.
             val useTx = subFlow(UseFlows.Responder(playerSession))
+
+            return GameTransactions(commitTx, casinoRevealTx, playerRevealTx, useTx)
         }
     }
 }

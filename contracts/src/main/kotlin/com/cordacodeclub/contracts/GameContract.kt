@@ -1,8 +1,6 @@
 package com.cordacodeclub.contracts
 
-import com.cordacodeclub.states.CommittedState
-import com.cordacodeclub.states.GameState
-import com.cordacodeclub.states.RevealedState
+import com.cordacodeclub.states.*
 import net.corda.core.contracts.*
 import net.corda.core.contracts.Requirements.using
 import net.corda.core.internal.toMultiMap
@@ -53,13 +51,25 @@ class GameContract : Contract {
                     }
                 }
                 .toMultiMap()
+        requireThat {
+            "All input game states must have an associated command" using tx.inputs
+                    .filter { ref -> ref.state.data is GameState }
+                    .all { coveredStates[inputsKey]?.contains(it.ref) ?: false }
+            "All output game states must have an associated command" using tx.outputs
+                    .mapIndexedNotNull { index, state ->
+                        (state.data as? GameState)?.let { index }
+                    }
+                    .all { coveredStates[outputsKey]?.contains(StateRef(tx.id, it)) ?: false }
+        }
     }
 
     private fun verifyCreate(tx: LedgerTransaction, create: Commands.Create, signers: List<PublicKey>,
                              outputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>): StateAndRef<GameState> {
         "The output must be a GameState" using (tx.outputStates[create.outputIndex] is GameState)
-        val gameState = tx.outputStates[create.outputIndex] as GameState
-        val associatedCommits = gameState.commitIds.map { outputIds[it] }
+        val gameRef = tx.outRef<GameState>(create.outputIndex)
+        val gameState = gameRef.state.data
+        val associatedCommits = listOf(gameState.casino, gameState.player)
+                .map { outputIds[it.committer.linearId] }
         "The commit ids must all be associated CommittedStates" using associatedCommits.all { pair ->
             pair?.let { (commitIndex, linearState) ->
                 linearState is CommittedState
@@ -71,6 +81,26 @@ class GameContract : Contract {
                 .mapNotNull { (it?.second as? CommittedState)?.revealDeadline }
                 .distinct()
                 .size == 1)
+        "The game bettors must all have commits" using (associatedCommits
+                .mapNotNull { (it?.second as? CommittedState)?.creator }
+                .distinct()
+                .size == 2)
+        "The game bettors must be signers" using listOf(gameState.casino, gameState.player)
+                .map { it.committer.holder.owningKey }
+                .toSet()
+                .equals(signers.toSet())
+        "The output locked token index must be possible" using (gameState.lockedWagersOutputIndex < tx.outputs.size)
+        val lockedToken = tx.getOutput(gameState.lockedWagersOutputIndex)
+                .also { "There must be a LockableTokenState at the output index" using (it is LockableTokenState) }
+                .let { it as LockableTokenState }
+        "The output locked token must be locked" using lockedToken.isLocked
+        "The output locked token must have the same issuer as the game" using (lockedToken.issuer == gameState.tokenIssuer)
+        "The output locked token must have the right amount" using (lockedToken.amount == gameState.bettedAmount)
+        val lockedTokenRef = tx.outRef<LockableTokenState>(gameState.lockedWagersOutputIndex)
+        "The output locked token and the game must be mutually encumbered" using
+                (gameRef.state.encumbrance == gameState.lockedWagersOutputIndex
+                        && lockedTokenRef.state.encumbrance == create.outputIndex)
+
         return tx.outRef(create.outputIndex)
     }
 
@@ -79,13 +109,42 @@ class GameContract : Contract {
         val gameRef = tx.inputs[resolve.inputIndex]
         "The input must be a GameState" using (gameRef.state.data is GameState)
         val gameState = gameRef.state.data as GameState
-        "The commit ids must all be associated RevealedStates" using gameState.commitIds.all { revealId ->
-            inputIds[revealId]?.let { (revealIndex, linearState) ->
-                linearState is RevealedState
-                        && linearState.game.pointer == gameRef.ref
-                        && tx.inRef<RevealedState>(revealIndex).state.contract == CommitContract.id
-            } ?: false
-        }
+        "The commit ids must all be associated RevealedStates" using listOf(gameState.casino, gameState.player)
+                .map { it.committer.linearId }
+                .all { revealId ->
+                    inputIds[revealId]?.let { (revealIndex, linearState) ->
+                        linearState is RevealedState
+                                && linearState.game.pointer == gameRef.ref
+                                && tx.inRef<RevealedState>(revealIndex).state.contract == CommitContract.id
+                    } ?: false
+                }
+        val (casinoImage, playerImage) = listOf(gameState.casino, gameState.player)
+                .map { it.committer.linearId }
+                .mapNotNull { inputIds[it]?.second as? RevealedState }
+                .map { it.image }
+                .also { "There should be 2 images " using (it.size == 2) }
+        val expectedPlayerPayout = Math.multiplyExact(
+                gameState.player.issuedAmount.amount.quantity,
+                CommitImage.playerPayoutCalculator(casinoImage, playerImage))
+        val actualCasinoPayout = tx.outputStates
+                .filterIsInstance<LockableTokenState>()
+                .filter { it.holder == gameState.casino.committer.holder && it.issuer == gameState.tokenIssuer }
+                .takeIf { it.isNotEmpty() }
+                ?.reduce(LockableTokenState::plus)
+                ?.amount
+                ?.quantity
+                ?: 0L
+        val actualPlayerPayout = tx.outputStates
+                .filterIsInstance<LockableTokenState>()
+                .filter { it.holder == gameState.player.committer.holder && it.issuer == gameState.tokenIssuer }
+                .takeIf { it.isNotEmpty() }
+                ?.reduce(LockableTokenState::plus)
+                ?.amount
+                ?.quantity
+                ?: 0L
+        "The player payout should be correct" using (actualPlayerPayout == expectedPlayerPayout)
+        "The casino payout should be correct" using
+                (actualCasinoPayout == (gameState.bettedAmount.quantity - expectedPlayerPayout))
         return tx.inRef(resolve.inputIndex)
     }
 
