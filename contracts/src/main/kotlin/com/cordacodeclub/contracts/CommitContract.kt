@@ -8,6 +8,7 @@ import net.corda.core.contracts.*
 import net.corda.core.internal.toMultiMap
 import net.corda.core.transactions.LedgerTransaction
 import java.security.PublicKey
+import java.time.Instant
 
 class CommitContract : Contract {
 
@@ -45,7 +46,7 @@ class CommitContract : Contract {
                                     .let { listOf(inputsKey to it.first.ref, outputsKey to it.second.ref) }
                         is Commands.Use ->
                             listOf(inputsKey to verifyUse(tx, command.value as Commands.Use, command.signers, inputIds).ref)
-                        is Commands.Close -> listOf(inputsKey to verifyClosure(tx))
+                        is Commands.Close -> listOf(inputsKey to verifyClosure(tx, command.value as Commands.Close, command.signers, inputIds).ref)
                     }
                 }
                 .toMultiMap()
@@ -143,24 +144,35 @@ class CommitContract : Contract {
         return tx.inRef(use.inputIndex)
     }
 
-    private fun verifyClosure(tx: LedgerTransaction) {
+    private fun verifyClosure(
+            tx: LedgerTransaction,
+            close: Commands.Close,
+            signers: List<PublicKey>,
+            inputIds: Map<UniqueIdentifier, List<LinearState>>
+    ): StateAndRef<*> {
         requireThat {
+            val inputState = tx.inputs[close.inputIndex].state.data
             val outputGameState = tx.outputsOfType<GameState>()
-            val inputGameState = tx.inputsOfType<GameState>()
-            val inputRevealedState = tx.outputsOfType<RevealedState>()
-            val outputRevealedState = tx.inputsOfType<RevealedState>()
+            val inputGameState = tx.referenceInputRefsOfType<GameState>()
 
             "The input must be a GameState" using (inputGameState.size == 1)
             "There must not be any output GameStates" using (outputGameState.isEmpty())
 
-            "The input must be a RevealedState" using (inputRevealedState.isNotEmpty())
-            "There must not be any RevealedStates" using (outputRevealedState.isEmpty())
-
-            inputRevealedState.map {
-                "The RevealState input must refer to the same GameState" using tx.inputs
-                        .map { it.ref }
-                        .contains(it.game.pointer)
+            when (inputState) {
+                is CommittedState -> {
+                    "The input must be a CommittedState" using (tx.inputs[close.inputIndex].state.data is RevealedState)
+                    val committedState = tx.inputs[close.inputIndex].state.data as CommittedState
+                    "Foreclosure can only be done after the deadline" using (committedState.revealDeadline < Instant.now())
+                    "The game index reference must be unchanged" using (committedState.gameOutputIndex
+                            == inputGameState.single().ref.index)
+                }
+                is RevealedState -> {
+                    "The input must be a RevealedState" using (tx.inputs[close.inputIndex].state.data is RevealedState)
+                    "The game index reference must be unchanged" using (( tx.inputs[close.inputIndex].state.data as RevealedState)
+                            .game.pointer == inputGameState.single().ref)
+                }
             }
+            return tx.inputs[close.inputIndex]
         }
     }
 
@@ -168,7 +180,7 @@ class CommitContract : Contract {
         class Commit(val outputIndex: Int) : Commands()
         class Reveal(val inputIndex: Int, val outputIndex: Int) : Commands()
         class Use(val inputIndex: Int) : Commands()
-        object Close : Commands()
+        class Close(val inputIndex: Int) : Commands()
     }
 
 }

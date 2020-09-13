@@ -49,8 +49,7 @@ class GameContract : Contract {
                             listOf(inputsKey to
                                     verifyResolve(tx, command.value as Commands.Resolve, command.signers, inputIds).ref)
                         is Commands.Close -> {
-                            listOf(0 to
-                                    verifyClose(tx))
+                            listOf(0 to verifyClose(tx))
                         }
                     }
                 }

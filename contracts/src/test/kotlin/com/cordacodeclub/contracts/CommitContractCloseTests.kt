@@ -6,14 +6,9 @@ import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.common.internal.testNetworkParameters
 import net.corda.testing.core.TestIdentity
-import net.corda.testing.dsl.LedgerDSL
-import net.corda.testing.dsl.TestLedgerDSLInterpreter
-import net.corda.testing.dsl.TestTransactionDSLInterpreter
 import net.corda.testing.node.MockServices
-import net.corda.testing.node.ledger
 import net.corda.testing.node.transaction
 import org.junit.Test
-import java.time.Instant
 import java.util.*
 
 class CommitContractCloseTests {
@@ -23,6 +18,8 @@ class CommitContractCloseTests {
             cordappPackages = listOf("com.cordacodeclub.contracts", "net.corda.testing.contracts"),
             firstIdentity = notaryId,
             networkParameters = testNetworkParameters().copy(minimumPlatformVersion = 4))
+    private val issuerId = TestIdentity(CordaX500Name("Issuer", "Amsterdam", "NL"))
+    private val issuer = issuerId.identity.party
     private val casinoId = TestIdentity(CordaX500Name("Casino", "London", "GB"))
     private val casino = casinoId.identity.party
     private val playerId = TestIdentity(CordaX500Name("Player", "Paris", "FR"))
@@ -33,13 +30,27 @@ class CommitContractCloseTests {
     fun `Close command passes contract`() {
         ledgerServices.transaction {
             val casinoId = UniqueIdentifier()
-            val gameStateAndRef = StateAndRef(TransactionState(
-                    GameState(listOf(casinoId), UniqueIdentifier(), listOf(casino)), GameContract.id, notaryId.party), StateRef(SecureHash.zeroHash, 1))
+            val playerId = UniqueIdentifier()
+            val gameStateAndRef = StateAndRef(
+                    TransactionState(
+                            GameState(
+                                    casino commitsTo casinoId with (199L issuedBy issuer),
+                                    player commitsTo playerId with (1L issuedBy issuer),
+                                    3,
+                                    UniqueIdentifier(),
+                                    listOf(casino)),
+                            GameContract.id,
+                            notaryId.party),
+                    StateRef(SecureHash.zeroHash, 1))
             input(GameContract.id, gameStateAndRef.state.data)
-            input(CommitContract.id, RevealedState(CommitImage.createRandom(random), player,
-                    StaticPointer(gameStateAndRef.ref, GameState::class.java), UniqueIdentifier(), listOf(player, casino)))
-            command(casino.owningKey, CommitContract.Commands.Close)
-            command(casino.owningKey, GameContract.Commands.Resolve(0))
+            input(CommitContract.id, RevealedState(
+                    CommitImage.createRandom(random),
+                    casino,
+                    StaticPointer(gameStateAndRef.ref, GameState::class.java),
+                    UniqueIdentifier(),
+                    listOf(casino)))
+            command(casino.owningKey, CommitContract.Commands.Close(0))
+            command(casino.owningKey, GameContract.Commands.Close)
             verifies()
         }
     }
