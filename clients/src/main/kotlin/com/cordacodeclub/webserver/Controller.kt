@@ -1,8 +1,7 @@
 package com.cordacodeclub.webserver
 
-import com.cordacodeclub.flows.CreateUserAccount
-import com.cordacodeclub.flows.GetUserBalance
-import com.cordacodeclub.flows.InitiatePlayGame
+import com.cordacodeclub.flows.*
+import net.corda.core.identity.CordaX500Name
 import net.corda.core.messaging.startFlow
 import net.corda.core.utilities.getOrThrow
 import org.slf4j.LoggerFactory
@@ -19,6 +18,8 @@ class Controller(rpc: NodeRPCConnection) {
 
     companion object {
         private val logger = LoggerFactory.getLogger(RestController::class.java)
+        // TODO change
+        private val TODO_casino_x500 = CordaX500Name.parse("O=Casino, L=London, C=GB")
     }
 
     private val proxy = rpc.proxy
@@ -38,7 +39,10 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = ["/balance"], produces = ["text/plain"])
     private fun balance(@RequestParam(value = "name") name: String): ResponseEntity<String> {
         try {
-            val balance = proxy.startFlow(::GetUserBalance, name).returnValue.getOrThrow()
+            val balance = proxy.startFlow(
+                    LockableTokenFlows.Balance::SimpleLocal,
+                    name, TODO_casino_x500)
+                    .returnValue.getOrThrow()
             return ResponseEntity.ok(balance.toString())
         } catch (e: Exception) {
             val error = e.toString()
@@ -50,7 +54,10 @@ class Controller(rpc: NodeRPCConnection) {
     private fun spin(request: HttpServletRequest): ResponseEntity<SpinResult> {
         val name = request.getParameter("name")
         try {
-            val result = proxy.startFlow(::InitiatePlayGame, name).returnValue.getOrThrow()
+            val result = proxy.startFlow(
+                    GameFlows::SimpleInitiator,
+                    name, 1, TODO_casino_x500, TODO_casino_x500)
+                    .returnValue.getOrThrow()
             return ResponseEntity.ok(SpinResult(result))
         } catch (e: Exception) {
             val error = e.toString()
@@ -75,7 +82,11 @@ class Controller(rpc: NodeRPCConnection) {
     private fun spinPayout(request: HttpServletRequest): ResponseEntity<String> {
         val name = request.getParameter("name")
         try {
-            val result = proxy.startFlow(::InitiatePlayGame, name).returnValue.getOrThrow()
+
+            val result = proxy.startFlow(
+                    GameFlows::SimpleInitiator,
+                    name, 1, TODO_casino_x500, TODO_casino_x500)
+                    .returnValue.getOrThrow()
             // returns a single simple element from the GameResult
             return ResponseEntity.ok("Created ${result.payout_credits}")
         } catch (e: Exception) {
