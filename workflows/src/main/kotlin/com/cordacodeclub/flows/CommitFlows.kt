@@ -17,6 +17,8 @@ import net.corda.core.identity.Party
 import net.corda.core.node.StatesToRecord
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.utilities.ProgressTracker
+import net.corda.core.utilities.ProgressTracker.Step
 import net.corda.core.utilities.unwrap
 
 /**
@@ -30,57 +32,98 @@ object CommitFlows {
      * Its handler is [Responder].
      */
     class Initiator(
-            val notary: Party,
-            val playerHash: SecureHash,
-            val setup: GameFlows.GameSetup,
-            val playerTokens: List<StateAndRef<LockableTokenState>>,
-            val casinoSession: FlowSession) : FlowLogic<SignedTransaction>() {
+            private val notary: Party,
+            private val playerHash: SecureHash,
+            private val setup: GameFlows.GameSetup,
+            private val playerTokens: List<StateAndRef<LockableTokenState>>,
+            private val casinoSession: FlowSession,
+            override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
+
+        companion object {
+            object ResolvingCasino : Step("Resolving casino.")
+            object ReceivingCasinoHash : Step("Receiving casino hash.")
+            object GeneratingTransaction : Step("Generating transaction.")
+            object AddingPlayerTokens : Step("Adding player tokens.")
+            object SendingPlayerTokens : Step("Sending player tokens to casino.")
+            object ReceivingCasinoTokens : Step("Receiving casino tokens.")
+            object AddingCasinoTokens : Step("Adding casino tokens.")
+            object VerifyingTransaction : Step("Verifying contract constraints.")
+            object SigningTransaction : Step("Signing transaction with player key.")
+            object GatheringSigs : Step("Gathering the casino's signature.") {
+                override fun childProgressTracker() = CollectSignaturesFlow.tracker()
+            }
+
+            object FinalisingTransaction : Step("Finalising transaction.") {
+                override fun childProgressTracker() = FinalityFlow.tracker()
+            }
+
+            fun tracker() = ProgressTracker(
+                    ResolvingCasino,
+                    ReceivingCasinoHash,
+                    GeneratingTransaction,
+                    AddingPlayerTokens,
+                    SendingPlayerTokens,
+                    ReceivingCasinoTokens,
+                    AddingCasinoTokens,
+                    VerifyingTransaction,
+                    SigningTransaction,
+                    GatheringSigs,
+                    FinalisingTransaction)
+        }
 
         @Suspendable
         override fun call(): SignedTransaction {
-            val (player, playerWager, issuer, casino,
-                    commitDeadline, revealDeadline) = setup
-            if (casinoSession.counterparty != serviceHub.identityService.wellKnownPartyFromAnonymous(casino)
+            progressTracker.currentStep = ResolvingCasino
+            if (casinoSession.counterparty != serviceHub.identityService.wellKnownPartyFromAnonymous(setup.casino)
                     ?: throw FlowException("Cannot resolve the casino host"))
                 throw FlowException("The casinoSession is not for the casino")
+
+            progressTracker.currentStep = ReceivingCasinoHash
             val casinoHash = casinoSession.receive<SecureHash>().unwrap { it }
+
+            progressTracker.currentStep = GeneratingTransaction
             val playerCommitId = UniqueIdentifier()
             val casinoCommitId = UniqueIdentifier()
             val builder = TransactionBuilder(notary)
-                    .addOutputState(CommittedState(playerHash, setup.player, revealDeadline, 2,
+                    .addOutputState(CommittedState(playerHash, setup.player, setup.revealDeadline, 2,
                             playerCommitId, listOf(setup.player)))
                     .addCommand(Command(Commit(0), setup.player.owningKey))
-                    .addOutputState(CommittedState(casinoHash, casino, revealDeadline, 2,
-                            casinoCommitId, listOf(setup.player, casino)))
-                    .addCommand(Command(Commit(1), casino.owningKey))
+                    .addOutputState(CommittedState(casinoHash, setup.casino, setup.revealDeadline, 2,
+                            casinoCommitId, listOf(setup.player, setup.casino)))
+                    .addCommand(Command(Commit(1), setup.casino.owningKey))
                     .addOutputState(
                             GameState(setup.casinoCommittedBettor(casinoCommitId),
                                     setup.playerCommittedBettor(playerCommitId), 3,
-                                    UniqueIdentifier(), listOf(setup.player, casino)),
+                                    UniqueIdentifier(), listOf(setup.player, setup.casino)),
                             GameContract.id, notary, 3)
                     .addCommand(Create(2), listOf(setup.casino.owningKey, setup.player.owningKey))
                     .addOutputState(
-                            LockableTokenState(issuer, Amount(setup.totalBetted, LockableTokenType),
-                                    listOf(casino, player)),
+                            LockableTokenState(setup.issuer, Amount(setup.totalBetted, LockableTokenType),
+                                    listOf(setup.casino, setup.player)),
                             LockableTokenContract.id, notary, 2)
-                    .setTimeWindow(TimeWindow.untilOnly(commitDeadline))
+                    .setTimeWindow(TimeWindow.untilOnly(setup.commitDeadline))
 
-            // Add player tokens.
+            progressTracker.currentStep = AddingPlayerTokens
             val playerChange = playerTokens
                     .map { it.state.data.amount }
                     .reduce(Amount<LockableTokenType>::plus)
-                    .minus(Amount(playerWager, LockableTokenType))
+                    .minus(Amount(setup.playerWager, LockableTokenType))
             val playerTokenInputIndices = playerTokens.mapIndexed { index, state ->
                 builder.addInputState(state)
                 index
             }
             val playerTokenOutputIndices = if (Amount(0L, LockableTokenType) < playerChange) {
-                builder.addOutputState(LockableTokenState(player, issuer, playerChange))
+                builder.addOutputState(LockableTokenState(setup.player, setup.issuer, playerChange))
                 listOf(3, 4)
             } else listOf(3)
+
+            progressTracker.currentStep = SendingPlayerTokens
             subFlow(SendStateAndRefFlow(casinoSession, playerTokens))
-            // Add casino tokens.
+
+            progressTracker.currentStep = ReceivingCasinoTokens
             val casinoTokens = subFlow(ReceiveStateAndRefFlow<LockableTokenState>(casinoSession))
+
+            progressTracker.currentStep = AddingCasinoTokens
             val casinoChange = casinoTokens
                     .map { it.state.data.amount }
                     .reduce(Amount<LockableTokenType>::plus)
@@ -92,18 +135,28 @@ object CommitFlows {
                 currentInputCount + index
             }
             val casinoTokenOutputIndices = if (Amount(0L, LockableTokenType) < casinoChange) {
-                builder.addOutputState(LockableTokenState(casino, issuer, casinoChange))
+                builder.addOutputState(LockableTokenState(setup.casino, setup.issuer, casinoChange))
                 listOf(currentOutputCount)
             } else listOf()
             builder.addCommand(Lock(playerTokenInputIndices + casinoTokenInputIndices,
                     playerTokenOutputIndices + casinoTokenOutputIndices),
-                    listOf(player.owningKey, casino.owningKey))
+                    listOf(setup.player.owningKey, setup.casino.owningKey))
 
+            progressTracker.currentStep = VerifyingTransaction
             builder.verify(serviceHub)
+
+            progressTracker.currentStep = SigningTransaction
             val partiallySignedTx = serviceHub.signInitialTransaction(builder, setup.player.owningKey)
+
+            progressTracker.currentStep = GatheringSigs
             val fullySignedTx = subFlow(CollectSignaturesFlow(
-                    partiallySignedTx, listOf(casinoSession), listOf(setup.player.owningKey)))
-            return subFlow(FinalityFlow(fullySignedTx, casinoSession))
+                    partiallySignedTx, listOf(casinoSession), listOf(setup.player.owningKey),
+                    GatheringSigs.childProgressTracker()))
+
+            progressTracker.currentStep = FinalisingTransaction
+            return subFlow(FinalityFlow(fullySignedTx,
+                    listOf(casinoSession),
+                    FinalisingTransaction.childProgressTracker()))
         }
     }
 
@@ -115,25 +168,55 @@ object CommitFlows {
             val playerSession: FlowSession,
             val setup: GameFlows.GameSetup,
             val casinoHash: SecureHash,
-            val casinoTokens: List<StateAndRef<LockableTokenState>>) : FlowLogic<SignedTransaction>() {
+            val casinoTokens: List<StateAndRef<LockableTokenState>>,
+            override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
 
         companion object {
             const val minCommits = 2
+
+            object ResolvingPlayer : Step("Resolving player.")
+            object SendingCasinoHash : Step("Sending casino hash.")
+            object ReceivingPlayerTokens : Step("Receiving player tokens to casino.")
+            object SendingCasinoTokens : Step("Sending casino tokens.")
+            object SigningTransaction : Step("Verifying transaction to sign.") {
+                override fun childProgressTracker() = SignTransactionFlow.tracker()
+            }
+
+            object FinalisingTransaction : Step("Finalising transaction.")
+
+            fun tracker() = ProgressTracker(
+                    ResolvingPlayer,
+                    SendingCasinoHash,
+                    ReceivingPlayerTokens,
+                    SendingCasinoTokens,
+                    SigningTransaction,
+                    FinalisingTransaction)
         }
 
         @Suspendable
         override fun call(): SignedTransaction {
+            progressTracker.currentStep = ResolvingPlayer
             if (playerSession.counterparty != serviceHub.identityService.wellKnownPartyFromAnonymous(setup.player)
                     ?: throw FlowException("Cannot resolve the player host"))
                 throw FlowException("The playerSession is not for the player")
+
+            progressTracker.currentStep = SendingCasinoHash
             playerSession.send(casinoHash)
+
+            progressTracker.currentStep = ReceivingPlayerTokens
             subFlow(ReceiveStateAndRefFlow<LockableTokenState>(playerSession))
+
+            progressTracker.currentStep = SendingCasinoTokens
             subFlow(SendStateAndRefFlow(playerSession, casinoTokens))
             val casinoChange = casinoTokens
                     .map { it.state.data.amount }
                     .reduce(Amount<LockableTokenType>::plus)
                     .minus(Amount(setup.casinoWager, LockableTokenType))
-            val fullySignedTx = subFlow(object : SignTransactionFlow(playerSession) {
+
+            progressTracker.currentStep = SigningTransaction
+            val fullySignedTx = subFlow(object : SignTransactionFlow(
+                    playerSession,
+                    SigningTransaction.childProgressTracker()) {
 
                 override fun checkTransaction(stx: SignedTransaction) {
                     // Only 3 commands with a local key, i.e. to sign by me.
@@ -218,6 +301,7 @@ object CommitFlows {
             // launch a correct FinalityFlow.
 
             // All visible so we also record the other commit state.
+            progressTracker.currentStep = FinalisingTransaction
             return subFlow(ReceiveFinalityFlow(playerSession, fullySignedTx.id, StatesToRecord.ALL_VISIBLE))
         }
     }
