@@ -19,6 +19,7 @@ import java.util.*
 object UserAccountFlows {
 
     object Create {
+
         /**
          * Its handler is [Responder].
          */
@@ -51,12 +52,12 @@ object UserAccountFlows {
             @Suspendable
             override fun call(): Pair<StateAndRef<AccountInfo>, AnonymousParty> {
                 progressTracker.currentStep = VerifyingNameUnicity
-                if (accountService.accountInfo(accountName).any { it.state.data.host == ourIdentity }) {
-                    throw FlowException("$accountName account already exists")
-                }
-
-                progressTracker.currentStep = CreatingAccount
-                val accountRef = subFlow(CreateAccount(accountName))
+                val accountRef = accountService.accountInfo(accountName)
+                        .firstOrNull { it.state.data.host == ourIdentity }
+                        ?: run {
+                            progressTracker.currentStep = CreatingAccount
+                            subFlow(CreateAccount(accountName))
+                        }
 
                 progressTracker.currentStep = SendingAccountToObservers
                 val observerSessions = observers.filter { it != ourIdentity }
