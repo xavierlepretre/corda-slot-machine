@@ -9,8 +9,8 @@ import net.corda.core.serialization.CordaSerializable
 @CordaSerializable
 class GameResult private constructor(
         val error: String?,
-        val payout_credits: Int,
-        val balance: Int) {
+        val payout_credits: Long,
+        val balance: Long) {
 
     init {
         if (error != null) {
@@ -22,18 +22,8 @@ class GameResult private constructor(
     }
 
     constructor(
-            payout_credits: Int,
-            balance: Int) : this(null, payout_credits, balance)
+            payout_credits: Long,
+            balance: Long) : this(null, payout_credits, balance)
 
-    constructor(error: String, balance: Int) : this(error, 0, 0)
-}
-
-@InitiatingFlow
-@StartableByRPC
-class InitiatePlayGame(private val accountName: String) : FlowLogic<GameResult>() {
-
-    @Suspendable
-    override fun call(): GameResult {
-        return GameResult(15, 141)
-    }
+    constructor(error: String, balance: Long) : this(error, 0L, balance)
 }

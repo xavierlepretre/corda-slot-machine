@@ -23,24 +23,7 @@ class CreateUserAccount(private val accountName: String) : FlowLogic<Int>() {
         // call inbuilt CreateAccount flow to create the AccountInfo object
         subFlow(CreateAccount(accountName))
 
-        // TODO get the balance
+        // TODO issue tokens and get the balance
         return 50;
-    }
-}
-
-@InitiatingFlow
-@StartableByRPC
-class GetUserBalance(private val accountName: String) : FlowLogic<Int>() {
-
-    @Suspendable
-    override fun call(): Int {
-
-        // not sure whether this explicit check is necessary or whether CreateAccount can throw
-        if (!accountService.accountInfo(accountName).any() { it.state.data.host == ourIdentity }) {
-            throw FlowException("$accountName account does not exist")
-        }
-
-        // TODO get the balance
-        return 42;
     }
 }
