@@ -8,6 +8,7 @@ import com.r3.corda.lib.accounts.workflows.flows.ShareAccountInfoFlow
 import com.r3.corda.lib.accounts.workflows.flows.ShareAccountInfoHandlerFlow
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.flows.*
+import net.corda.core.identity.AnonymousParty
 import net.corda.core.identity.Party
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.utilities.ProgressTracker
@@ -25,7 +26,8 @@ object UserAccountFlows {
         @StartableByRPC
         class Initiator(private val accountName: String,
                         private val observers: List<Party>,
-                        override val progressTracker: ProgressTracker) : FlowLogic<StateAndRef<AccountInfo>>() {
+                        override val progressTracker: ProgressTracker)
+            : FlowLogic<Pair<StateAndRef<AccountInfo>, AnonymousParty>>() {
 
             constructor(accountName: String, observers: List<Party>) : this(accountName, observers, tracker())
             constructor(accountName: String, observer: Party) : this(accountName, listOf(observer))
@@ -47,9 +49,9 @@ object UserAccountFlows {
             }
 
             @Suspendable
-            override fun call(): StateAndRef<AccountInfo> {
+            override fun call(): Pair<StateAndRef<AccountInfo>, AnonymousParty> {
                 progressTracker.currentStep = VerifyingNameUnicity
-                if (accountService.accountInfo(accountName).any() { it.state.data.host == ourIdentity }) {
+                if (accountService.accountInfo(accountName).any { it.state.data.host == ourIdentity }) {
                     throw FlowException("$accountName account already exists")
                 }
 
@@ -70,7 +72,7 @@ object UserAccountFlows {
                         Sync.ToSync(accountRef.state.data.identifier.id, accountParty.owningKey),
                         observerSessions))
 
-                return accountRef
+                return accountRef to accountParty
             }
         }
 

@@ -212,9 +212,10 @@ object LockableTokenFlows {
          */
         @InitiatingFlow
         @StartableByRPC
-        class InitiatorBeg(private val request: Request,
-                           override val progressTracker: ProgressTracker = tracker())
+        class InitiatorBeg(private val request: Request, override val progressTracker: ProgressTracker)
             : FlowLogic<SignedTransaction>() {
+
+            constructor(request: Request) : this(request, tracker())
 
             companion object {
                 object ResolvingIssuer : ProgressTracker.Step("Resolving issuer.")

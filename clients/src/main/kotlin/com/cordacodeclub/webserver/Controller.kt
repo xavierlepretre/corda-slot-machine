@@ -36,42 +36,41 @@ class Controller(rpc: NodeRPCConnection) {
     @PostMapping(value = ["/create"], produces = ["text/plain"])
     private fun create(request: HttpServletRequest): ResponseEntity<String> {
         val name = request.getParameter("name")
-        try {
-            val accountRef = proxy.startFlow(UserAccountFlows.Create::Initiator, name)
+        return try {
+            val player = proxy.startFlow(UserAccountFlows.Create::Initiator, name)
                     .returnValue.getOrThrow()
-            proxy.startFlow(LockableTokenFlows.Issue::InitiatorBegSimple, notary, name, casino)
+                    .second
+            proxy.startFlow(LockableTokenFlows.Issue::InitiatorBeg,
+                    LockableTokenFlows.Issue.Request(notary, player, casino))
                     .returnValue.getOrThrow()
-            val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, casino)
+            val balance = proxy.startFlow(LockableTokenFlows.Balance::Local, player, casino)
                     .returnValue.getOrThrow()
-            return ResponseEntity.ok(balance.toString())
-        } catch (e: Exception) {
-            val error = e.toString()
-            return ResponseEntity.ok("Failed $error")
+            ResponseEntity.ok(balance.toString())
+        } catch (error: Exception) {
+            ResponseEntity.ok("Failed $error")
         }
     }
 
     @GetMapping(value = ["/balance"], produces = ["text/plain"])
     private fun balance(@RequestParam(value = "name") name: String): ResponseEntity<String> {
-        try {
+        return try {
             val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, casino)
                     .returnValue.getOrThrow()
-            return ResponseEntity.ok(balance.toString())
-        } catch (e: Exception) {
-            val error = e.toString()
-            return ResponseEntity.ok("Failed $error")
+            ResponseEntity.ok(balance.toString())
+        } catch (error: Exception) {
+            ResponseEntity.ok("Failed $error")
         }
     }
 
     @PostMapping(value = ["/spin"], produces = ["application/json"])
     private fun spin(request: HttpServletRequest): ResponseEntity<SpinResult> {
         val name = request.getParameter("name")
-        try {
+        return try {
             val result = proxy.startFlow(GameFlows::SimpleInitiator, name, 1L, casino, casino)
                     .returnValue.getOrThrow()
-            return ResponseEntity.ok(SpinResult(result))
-        } catch (e: Exception) {
-            val error = e.toString()
-            return ResponseEntity.ok(SpinResult("Failed $error"))
+            ResponseEntity.ok(SpinResult(result))
+        } catch (error: Exception) {
+            ResponseEntity.ok(SpinResult("Failed $error"))
         }
     }
 
@@ -91,15 +90,13 @@ class Controller(rpc: NodeRPCConnection) {
     @PostMapping(value = ["/payout"], produces = ["text/plain"])
     private fun spinPayout(request: HttpServletRequest): ResponseEntity<String> {
         val name = request.getParameter("name")
-        try {
-
+        return try {
             val result = proxy.startFlow(GameFlows::SimpleInitiator, name, 1L, casino, casino)
                     .returnValue.getOrThrow()
             // returns a single simple element from the GameResult
-            return ResponseEntity.ok("Created ${result.payout_credits}")
-        } catch (e: Exception) {
-            val error = e.toString()
-            return ResponseEntity.ok("Failed $error")
+            ResponseEntity.ok("Created ${result.payout_credits}")
+        } catch (error: Exception) {
+            ResponseEntity.ok("Failed $error")
         }
     }
 
