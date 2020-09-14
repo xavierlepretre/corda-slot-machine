@@ -24,7 +24,8 @@ object GameFlows {
      * Data transport class to inform the remote note in 1 send.
      */
     @CordaSerializable
-    data class GameSetup(val player: AbstractParty,
+    data class GameSetup(val notary: Party,
+                         val player: AbstractParty,
                          val playerWager: Long,
                          val issuer: AbstractParty,
                          val casino: AbstractParty,
@@ -190,7 +191,9 @@ object GameFlows {
 
             // Inform casino of new game
             progressTracker.currentStep = SendingGameSetup
-            val setup = GameSetup(player = player,
+            val notary = serviceHub.networkMapCache.notaryIdentities[0]
+            val setup = GameSetup(notary = notary,
+                    player = player,
                     playerWager = playerWager,
                     issuer = issuer,
                     casino = casino,
@@ -200,7 +203,6 @@ object GameFlows {
 
             // First notary, not caring much...
             progressTracker.currentStep = FetchingPlayerTokens
-            val notary = serviceHub.networkMapCache.notaryIdentities[0]
             // Player collects enough tokens for the wager.
             val playerTokens = subFlow(LockableTokenFlows.Fetch.Local(player, issuer,
                     playerWager, currentTopLevel?.runId?.uuid ?: throw FlowException("No running id"),
@@ -256,11 +258,21 @@ object GameFlows {
         constructor(playerSession: FlowSession) : this(playerSession, tracker())
 
         companion object {
+            // Limit to what the casino will accept to play.
+            const val maxPlayerWager = 100L
+
+            // Whether to auto issue tokens when not enough tokens can be fetched.
+            const val autoIssueWhenPossible = true
+
             object CreatingCasinoImage : ProgressTracker.Step("Creating casino image.")
             object ReceivingPlayer : ProgressTracker.Step("Receiving player.")
             object ReceivingGameSetup : ProgressTracker.Step("Receiving game setup.")
             object FetchingCasinoTokens : ProgressTracker.Step("Fetching casino tokens.") {
                 override fun childProgressTracker() = LockableTokenFlows.Fetch.Local.tracker()
+            }
+
+            object SelfIssuingCasinoTokens : ProgressTracker.Step("Self issuing casino tokens.") {
+                override fun childProgressTracker() = LockableTokenFlows.Issue.Initiator.tracker()
             }
 
             object PassingOnToCommitResponder : ProgressTracker.Step("Passing on to commit responder flow.") {
@@ -283,6 +295,7 @@ object GameFlows {
                     ReceivingPlayer,
                     ReceivingGameSetup,
                     FetchingCasinoTokens,
+                    SelfIssuingCasinoTokens,
                     PassingOnToCommitResponder,
                     ExtractingCommitResult,
                     PassingOnToCasinoReveal,
@@ -303,17 +316,28 @@ object GameFlows {
             // Receive new game information
             progressTracker.currentStep = ReceivingGameSetup
             val setup = playerSession.receive<GameSetup>().unwrap { it }
+            if (maxPlayerWager < setup.playerWager)
+                throw FlowException("Player wager cannot be more than $maxPlayerWager")
             if (Instant.now().plus(GameParameters.commitDuration) < setup.commitDeadline)
                 throw FlowException("Commit deadline is too far in the future")
             if (setup.commitDeadline.plus(GameParameters.revealDuration) != setup.revealDeadline)
                 throw FlowException("Reveal deadline is incorrect")
 
-            // Casino collects enough tokens for the wager.
+            // Casino collects or issues enough tokens for the wager.
             progressTracker.currentStep = FetchingCasinoTokens
-            val casinoTokens = subFlow(LockableTokenFlows.Fetch.Local(
-                    setup.casino, setup.issuer, setup.casinoWager,
-                    currentTopLevel?.runId?.uuid ?: throw FlowException("No running id"),
-                    FetchingCasinoTokens.childProgressTracker()))
+            val casinoTokens = try {
+                subFlow(LockableTokenFlows.Fetch.Local(
+                        setup.casino, setup.issuer, setup.casinoWager,
+                        currentTopLevel?.runId?.uuid ?: throw FlowException("No running id"),
+                        FetchingCasinoTokens.childProgressTracker()))
+            } catch (notEnough: LockableTokenFlows.Fetch.NotEnoughTokensException) {
+                if (!autoIssueWhenPossible || setup.issuer != setup.casino) throw notEnough
+                progressTracker.currentStep = SelfIssuingCasinoTokens
+                subFlow(LockableTokenFlows.Issue.Initiator(setup.notary, setup.casino, setup.casinoWager,
+                        setup.issuer, SelfIssuingCasinoTokens.childProgressTracker()))
+                        .tx
+                        .outRefsOfType<LockableTokenState>()
+            }
 
             // Casino gives commit info and gets both commits tx.
             progressTracker.currentStep = PassingOnToCommitResponder

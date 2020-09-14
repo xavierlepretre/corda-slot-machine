@@ -1,5 +1,6 @@
 package com.cordacodeclub.flows
 
+import com.r3.corda.lib.accounts.workflows.flows.RequestKeyForAccount
 import com.r3.corda.lib.accounts.workflows.internal.accountService
 import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
 import net.corda.core.flows.FlowException
@@ -20,19 +21,21 @@ fun FlowLogic<*>.getParty(accountName: String) = serviceHub.accountService
         .accountInfo(accountName)
         .let {
             if (it.isEmpty())
-                throw FlowException("No player with this name $accountName")
+                throw FlowException("No account with this name $accountName")
             else if (1 < it.size)
-                throw FlowException("More than 1 player found with this name $accountName")
+                throw FlowException("More than 1 account found with this name $accountName")
             it.single()
         }
         .state.data
         .let {accountInfo ->
-            if (accountInfo.host != ourIdentity)
-                throw FlowException("This player is not hosted here $accountName")
             serviceHub.identityService.publicKeysForExternalId(accountInfo.identifier.id)
                     .toList()
                     .let {
                         if (it.isNotEmpty()) AnonymousParty(it.first())
-                        else serviceHub.createKeyForAccount(accountInfo)
+                        else {
+                            if (accountInfo.host != ourIdentity)
+                                throw FlowException("This account is not hosted here $accountName")
+                            serviceHub.createKeyForAccount(accountInfo)
+                        }
                     }
         }
