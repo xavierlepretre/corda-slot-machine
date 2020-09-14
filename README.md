@@ -16,15 +16,20 @@ Then, play:
     ```shell
     >>> flow start com.cordacodeclub.flows.LockableTokenFlows$Issue$Initiator notary: Notary, holder: Casino, amount: 100000, issuer: Casino
     ```
-2. Create a player account. On Parties node:
+2. Create a player account and optionally inform the Casino. On Parties node:
 
     ```shell
-    >>> flow start com.cordacodeclub.flows.CreateUserAccount accountName: player1
+    >>> flow start com.cordacodeclub.flows.UserAccountFlows$Create$Initiator accountName: player1, observer: Casino
     ```
 3. Beg for some tokens from casino. On Parties node:
 
     ```shell
     >>> flow start com.cordacodeclub.flows.LockableTokenFlows$Issue$InitiatorBegSimple notary: Notary, holderAccountName: player1, issuer: Casino
+    ```
+    Or have the casino issue you as much as you want. On Casino node:
+    
+    ```shell
+    >>> flow start com.cordacodeclub.flows.LockableTokenFlows$Issue$SimpleInitiator notary: Notary, holderAccountName: player1, amount: 100000, issuer: Casino
     ```
 4. Start a game from player. On Parties node:
 
