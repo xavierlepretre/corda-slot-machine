@@ -122,8 +122,6 @@ object GameFlows {
                     ?: throw FlowException("Cannot resolve the casino host")
             if (casinoHost == ourIdentity) throw FlowException("You must play with a remote host, not yourself")
             val casinoSession = initiateFlow(casinoHost)
-            // Inform casino of player
-            subFlow(SyncKeyMappingFlow(casinoSession, listOf(player)))
             // Inform casino of new game
             subFlow(SyncKeyMappingFlow(casinoSession, listOf(player)))
             val setup = GameSetup(player = player,
@@ -170,8 +168,6 @@ object GameFlows {
         @Suspendable
         override fun call(): GameTransactions {
             val casinoImage = CommitImage.createRandom(Random())
-            // Receive player information
-            subFlow(SyncKeyMappingFlowHandler(playerSession))
             // Receive new game information
             subFlow(SyncKeyMappingFlowHandler(playerSession))
             val setup = playerSession.receive<GameSetup>().unwrap { it }

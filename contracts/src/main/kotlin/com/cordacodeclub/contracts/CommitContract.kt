@@ -8,7 +8,6 @@ import net.corda.core.contracts.*
 import net.corda.core.internal.toMultiMap
 import net.corda.core.transactions.LedgerTransaction
 import java.security.PublicKey
-import java.time.Instant
 
 class CommitContract : Contract {
 
@@ -149,30 +148,20 @@ class CommitContract : Contract {
             close: Commands.Close,
             signers: List<PublicKey>,
             inputIds: Map<UniqueIdentifier, List<LinearState>>
-    ): StateAndRef<*> {
+    ): StateAndRef<CommittedState> {
         requireThat {
-            val inputState = tx.inputs[close.inputIndex].state.data
-            val outputGameState = tx.outputsOfType<GameState>()
-            val inputGameState = tx.referenceInputRefsOfType<GameState>()
+            "The input must be a CommittedState" using (tx.inputs[close.inputIndex].state.data is CommittedState)
+            val committedStateAndRef = tx.inputs[close.inputIndex] as StateAndRef<CommittedState>
+            val committedState = committedStateAndRef.state.data
+            "The game must be referenced" using tx.referenceInputRefsOfType<GameState>()
+                    .any { it.ref == committedStateAndRef.getGamePointer().pointer }
+            "There must not be any output GameStates" using (tx.outputsOfType<GameState>().isEmpty())
+            "There must not be any output CommittedState" using (tx.outputsOfType<CommittedState>().isEmpty())
+            "Foreclosure can only be done after the deadline" using (committedState.revealDeadline < tx.timeWindow!!.untilTime)
+            "The game index reference must be unchanged" using (committedState.gameOutputIndex
+                    == tx.referenceInputRefsOfType<GameState>().single().ref.index)
 
-            "The input must be a GameState" using (inputGameState.size == 1)
-            "There must not be any output GameStates" using (outputGameState.isEmpty())
-
-            when (inputState) {
-                is CommittedState -> {
-                    "The input must be a CommittedState" using (tx.inputs[close.inputIndex].state.data is RevealedState)
-                    val committedState = tx.inputs[close.inputIndex].state.data as CommittedState
-                    "Foreclosure can only be done after the deadline" using (committedState.revealDeadline < Instant.now())
-                    "The game index reference must be unchanged" using (committedState.gameOutputIndex
-                            == inputGameState.single().ref.index)
-                }
-                is RevealedState -> {
-                    "The input must be a RevealedState" using (tx.inputs[close.inputIndex].state.data is RevealedState)
-                    "The game index reference must be unchanged" using (( tx.inputs[close.inputIndex].state.data as RevealedState)
-                            .game.pointer == inputGameState.single().ref)
-                }
-            }
-            return tx.inputs[close.inputIndex]
+            return tx.inRef(close.inputIndex)
         }
     }
 

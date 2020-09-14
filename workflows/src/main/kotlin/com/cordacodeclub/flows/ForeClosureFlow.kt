@@ -6,7 +6,9 @@ import com.cordacodeclub.contracts.GameContract
 import com.cordacodeclub.states.CommittedState
 import com.cordacodeclub.states.GameState
 import com.cordacodeclub.states.RevealedState
+import com.cordacodeclub.states.getGamePointer
 import net.corda.core.contracts.StateAndRef
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
@@ -18,22 +20,22 @@ object ForeClosureFlow {
 
     @StartableByRPC
     class SimpleInitiator(
-            val gameRef: StateAndRef<GameState>,
-            val myPartyName: CordaX500Name
+            val gameId: String
     ) : FlowLogic<Unit>() {
 
         @Suspendable
         override fun call() {
-            val notary = gameRef.state.notary
+            val gameStateAndRef = serviceHub.vaultService.queryBy<GameState>().states
+                    .singleOrNull { it.state.data.linearId.toString() == gameId } ?: throw FlowException("No game with id $gameId found.")
+            val notary = gameStateAndRef.state.notary
             val associatedRevealStates = serviceHub.vaultService.queryBy<RevealedState>().states
-                    .filter { it.state.data.game.pointer == gameRef.ref }
+                    .filter { it.state.data.game.pointer == gameStateAndRef.ref }
             val associatedCommitStates = serviceHub.vaultService.queryBy<CommittedState>().states
-                    .filter { it.state.data.gameOutputIndex == gameRef.ref.index }
+                    .filter { it.getGamePointer().pointer == gameStateAndRef.ref }
 
             subFlow(Initiator(revealRefs = associatedRevealStates,
                     commitRefs = associatedCommitStates,
-                    gameRef = gameRef,
-                    myPartyName = myPartyName,
+                    gameRef = gameStateAndRef,
                     notary = notary))
         }
     }
@@ -44,24 +46,21 @@ object ForeClosureFlow {
             val revealRefs: List<StateAndRef<RevealedState>>,
             val commitRefs: List<StateAndRef<CommittedState>>,
             val gameRef: StateAndRef<GameState>,
-            val myPartyName: CordaX500Name,
             val notary: Party?
     ) : FlowLogic<Unit>() {
 
         @Suspendable
         override fun call() {
             val notary = notary ?: gameRef.state.notary
-            val myParty = serviceHub.networkMapCache.getNodeByLegalName(myPartyName)?.identityFromX500Name(myPartyName)
-                    ?: throw FlowException("Identity $myPartyName not found.")
             val builder = TransactionBuilder(notary)
                     .addInputState(gameRef)
-                    .addCommand(GameContract.Commands.Close, myParty.owningKey)
+                    .addCommand(GameContract.Commands.Close, ourIdentity.owningKey)
 
-            addInputs(revealRefs, builder, myParty.owningKey)
-            addInputs(commitRefs, builder, myParty.owningKey)
+            addInputs(revealRefs, builder, ourIdentity.owningKey)
+            addInputs(commitRefs, builder, ourIdentity.owningKey)
             builder.verify(serviceHub)
 
-            val signed = serviceHub.signInitialTransaction(builder, myParty.owningKey)
+            val signed = serviceHub.signInitialTransaction(builder, ourIdentity.owningKey)
             subFlow(FinalityFlow(transaction = signed))
         }
     }
