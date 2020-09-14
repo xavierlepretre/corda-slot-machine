@@ -33,6 +33,35 @@ object LockableTokenFlows {
 
         const val automaticAmount = 100L
 
+        @StartableByRPC
+        class SimpleInitiator(private val notary: Party,
+                              private val holderAccountName: String,
+                              private val amount: Long,
+                              private val issuer: AbstractParty,
+                              override val progressTracker: ProgressTracker) : FlowLogic<SignedTransaction>() {
+
+            constructor(notary: Party, holderAccountName: String, amount: Long, issuer: AbstractParty)
+                    : this(notary, holderAccountName, amount, issuer, tracker())
+
+            companion object {
+                object ResolvingHolder : ProgressTracker.Step("Resolving holder.")
+                object PassingOnToInitiator : ProgressTracker.Step("Passing on to initiator.") {
+                    override fun childProgressTracker() = Initiator.tracker()
+                }
+
+                fun tracker() = ProgressTracker(ResolvingHolder, PassingOnToInitiator)
+            }
+
+            @Suspendable
+            override fun call(): SignedTransaction {
+                progressTracker.currentStep = ResolvingHolder
+                val holder = getParty(holderAccountName)
+
+                progressTracker.currentStep = PassingOnToInitiator
+                return subFlow(Initiator(notary, holder, amount, issuer, PassingOnToInitiator.childProgressTracker()))
+            }
+        }
+
         /**
          * Issues the amount of tokens to the given holders.
          * Its handler is [Responder].
@@ -183,9 +212,10 @@ object LockableTokenFlows {
          */
         @InitiatingFlow
         @StartableByRPC
-        class InitiatorBeg(private val request: Request,
-                           override val progressTracker: ProgressTracker = tracker())
+        class InitiatorBeg(private val request: Request, override val progressTracker: ProgressTracker)
             : FlowLogic<SignedTransaction>() {
+
+            constructor(request: Request) : this(request, tracker())
 
             companion object {
                 object ResolvingIssuer : ProgressTracker.Step("Resolving issuer.")
@@ -264,6 +294,14 @@ object LockableTokenFlows {
     object Fetch {
         const val PAGE_SIZE_DEFAULT = 200
 
+        class NotEnoughTokensException(message: String?, cause: Throwable?, originalErrorId: Long? = null) :
+                FlowException(message, cause, originalErrorId), IdentifiableException {
+            constructor(message: String?, cause: Throwable?) : this(message, cause, null)
+            constructor(message: String?) : this(message, null)
+            constructor(cause: Throwable?) : this(cause?.toString(), cause)
+            constructor() : this(null, null)
+        }
+
         /**
          * Fetches enough tokens issued by issuer and held by holder to cover the required amount.
          * The soft lock id it typically FlowLogic.currentTopLevel?.runId?.uuid ?: throw FlowException("No running id")
@@ -271,6 +309,7 @@ object LockableTokenFlows {
          * This code was inspired by the similar function found in the Token SDK here:
          * https://github.com/corda/token-sdk/blob/22e18e6/modules/selection/src/main/kotlin/com.r3.corda.lib.tokens.selection/database/selector/DatabaseTokenSelection.kt#L57-L110
          */
+        @StartableByRPC
         class Local(private val holder: AbstractParty,
                     private val issuer: AbstractParty,
                     private val requiredAmount: Long,
@@ -329,7 +368,7 @@ object LockableTokenFlows {
                     }
                     pageNumber++
                 } while (claimedAmount < requiredAmount && (pageSpec.pageSize * (pageNumber - 1)) <= results.totalStatesAvailable)
-                if (claimedAmount < requiredAmount) throw FlowException("Not enough tokens")
+                if (claimedAmount < requiredAmount) throw NotEnoughTokensException("Not enough tokens")
 
                 progressTracker.currentStep = SoftLockingTokens
                 serviceHub.vaultService.softLockReserve(softLockId, fetched.map { it.ref }.toNonEmptySet())
