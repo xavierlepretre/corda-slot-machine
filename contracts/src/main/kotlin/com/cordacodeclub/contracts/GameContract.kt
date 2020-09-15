@@ -49,7 +49,7 @@ class GameContract : Contract {
                             listOf(inputsKey to
                                     verifyResolve(tx, command.value as Commands.Resolve, command.signers, inputIds).ref)
                         is Commands.Close -> {
-                            listOf(0 to verifyClose(tx))
+                            listOf(inputsKey to verifyClose(tx, command.value as Commands.Close))
                         }
                     }
                 }
@@ -151,13 +151,13 @@ class GameContract : Contract {
         return tx.inRef(resolve.inputIndex)
     }
 
-    private fun verifyClose(tx: LedgerTransaction) {
-
+    private fun verifyClose(tx: LedgerTransaction, close: Commands.Close): StateAndRef<GameState> {
+        return tx.inRef(close.inputIndex)
     }
 
     sealed class Commands : CommandData {
         class Create(val outputIndex: Int) : Commands()
         class Resolve(val inputIndex: Int) : Commands()
-        object Close : Commands()
+        class Close(val inputIndex: Int) : Commands()
     }
 }

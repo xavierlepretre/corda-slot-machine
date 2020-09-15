@@ -9,7 +9,6 @@ import net.corda.core.internal.toMultiMap
 import net.corda.core.transactions.LedgerTransaction
 import java.security.PublicKey
 
-@Suppress("UNCHECKED_CAST")
 class CommitContract : Contract {
 
     companion object {
@@ -152,17 +151,13 @@ class CommitContract : Contract {
     ): StateAndRef<CommittedState> {
         requireThat {
             "The input must be a CommittedState" using (tx.inputs[close.inputIndex].state.data is CommittedState)
+            @Suppress("UNCHECKED_CAST")
             val committedStateAndRef = tx.inputs[close.inputIndex] as StateAndRef<CommittedState>
             val committedState = committedStateAndRef.state.data
             "The game must be referenced" using tx.referenceInputRefsOfType<GameState>()
                     .any { it.ref == committedStateAndRef.getGamePointer().pointer }
-            "There must not be any output GameStates" using (tx.outputsOfType<GameState>().isEmpty())
-            "There must not be any output CommittedState" using (tx.outputsOfType<CommittedState>().isEmpty())
             "The reveal deadline must be satisfied" using (tx.timeWindow?.untilTime != null
                             && tx.timeWindow?.untilTime!! <= committedState.revealDeadline)
-            "The game index reference must be unchanged" using (committedState.gameOutputIndex
-                    == tx.referenceInputRefsOfType<GameState>().single().ref.index)
-
             return tx.inRef(close.inputIndex)
         }
     }
