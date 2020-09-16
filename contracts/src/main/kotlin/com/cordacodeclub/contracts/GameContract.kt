@@ -152,6 +152,8 @@ class GameContract : Contract {
     }
 
     private fun verifyClose(tx: LedgerTransaction, close: Commands.Close): StateAndRef<GameState> {
+        val gameRef = tx.inputs[close.inputIndex]
+        "The input must be a GameState" using (gameRef.state.data is GameState)
         return tx.inRef(close.inputIndex)
     }
 

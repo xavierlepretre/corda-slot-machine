@@ -1,9 +1,11 @@
 package com.cordacodeclub.flows
 
 import com.cordacodeclub.states.GameState
+import com.cordacodeclub.states.LockableTokenState
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount
 import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingInitiator
+import net.corda.core.contracts.StateAndRef
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
@@ -51,6 +53,11 @@ class ForeClosureFlowTest {
         prepareIssuerAndHolders()
     }
 
+    @After
+    fun tearDown() {
+        network.stopNodes()
+    }
+
     private fun prepareIssuerAndHolders() {
         issuer = issuerNode.startFlow(CreateAccount("issuer"))
                 .also { network.runNetwork() }
@@ -85,20 +92,30 @@ class ForeClosureFlowTest {
         this.player2 = player2
     }
 
-    @After
-    fun tearDown() {
-        network.stopNodes()
+    private fun issueToken(issuerNode: StartedMockNode,
+                           holder: AbstractParty,
+                           issuer: AbstractParty,
+                           amount: Long) =
+            issueToken(issuerNode, listOf(holder to amount), issuer)[0]
+
+    private fun issueToken(issuerNode: StartedMockNode,
+                           holders: List<Pair<AbstractParty, Long>>,
+                           issuer: AbstractParty): List<StateAndRef<LockableTokenState>> {
+        return issuerNode.startFlow(LockableTokenFlows.Issue.Initiator(
+                network.defaultNotaryIdentity, holders, issuer))
+                .also { network.runNetwork() }
+                .get()
+                .tx
+                .outRefsOfType()
     }
 
     @Test
     fun `can run foreclosure flow with incomplete game flow`() {
-        playerNode.startFlow(GameFlows.Initiator(player1, casino1))
-        network.runNetwork()
-
-        val gameState = playerNode.services.vaultService.queryBy<GameState>().states.single()
-        val flow = playerNode.startFlow(ForeClosureFlow.Initiator(gameState, playerNode.info.legalIdentities.last().name))
-        network.runNetwork()
-        flow.get()
-
+        issueToken(issuerNode, casino1, issuer, GameState.maxPayoutRatio * 3L)
+        issueToken(issuerNode, player1, issuer, 3L)
+        //TODO figure out how to interrupt a game flow mid way
+        playerNode.startFlow(GameFlows.Initiator(player1, 3L, issuer, casino1))
+                .also { network.runNetwork() }
+                .get()
     }
 }

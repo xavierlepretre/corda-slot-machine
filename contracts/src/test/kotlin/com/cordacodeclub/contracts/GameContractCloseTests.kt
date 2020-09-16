@@ -1,7 +1,8 @@
 package com.cordacodeclub.contracts
 
 import com.cordacodeclub.states.*
-import net.corda.core.contracts.*
+import net.corda.core.contracts.Amount
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.common.internal.testNetworkParameters
@@ -10,12 +11,9 @@ import net.corda.testing.dsl.LedgerDSL
 import net.corda.testing.dsl.TestLedgerDSLInterpreter
 import net.corda.testing.dsl.TestTransactionDSLInterpreter
 import net.corda.testing.node.MockServices
-import net.corda.testing.node.ledger
-import org.junit.Test
-import java.math.BigInteger
 import java.time.Instant
 
-class CommitContractCloseTests {
+class GameContractCloseTests {
 
     private val notaryId = TestIdentity(CordaX500Name("Notary", "Washington D.C.", "US"))
     private val ledgerServices = MockServices(
@@ -56,35 +54,30 @@ class CommitContractCloseTests {
 
     //TODO fix failing test
 //    @Test
-//    fun `Close command needs a CommittedState state input`() {
-//        ledgerServices.transaction {
-//            val casinoId = UniqueIdentifier()
-//            val revealDeadline = Instant.now().plusSeconds(60)
-//            input(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-//                    revealDeadline, 2, casinoId))
-//            input(DummyContract.PROGRAM_ID, DummyState())
-//            command(player.owningKey, DummyCommandData)
-//            command(player.owningKey, CommitContract.Commands.Close(1))
-//            failsWith("The input must be a CommitState")
+//    fun `Close command needs a Game state input`() {
+//        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+//        val playerImage = CommitImage(BigInteger.valueOf(12L))
+//        ledgerServices.ledger {
+//            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+//            val (playerRef) = issueTx.outRefsOfType<CommittedState>()
+//            val (gameRef) = issueTx.outRefsOfType<GameState>()
+//            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
+//            transaction {
+//                input(playerRef.ref)
+//                command(player.owningKey, CommitContract.Commands.Close(0))
+//                input(lockedRef.ref)
+//                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(400L, LockableTokenType)))
+//                command(player.owningKey, LockableTokenContract.Commands.Release(listOf(1), listOf(0)))
+//                input(gameRef.ref)
+//
+//                tweak {
+//                    command(player.owningKey, GameContract.Commands.Close(0))
+//                    failsWith("The input must be a GameState")
+//                }
+//
+//                command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Close(2))
+//                verifies()
+//            }
 //        }
 //    }
-
-    @Test
-    fun `Close command passes contract with 1 commit`() {
-        val casinoImage = CommitImage(BigInteger.valueOf(11L))
-        val playerImage = CommitImage(BigInteger.valueOf(12L))
-        ledgerServices.ledger {
-            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
-            val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
-            transaction {
-                input(playerRef.ref)
-                reference(playerRef.getGamePointer().pointer)
-                timeWindow(TimeWindow.untilOnly(casinoRef.state.data.revealDeadline))
-
-                command(player.owningKey, CommitContract.Commands.Close(0))
-                command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Close(1))
-                verifies()
-            }
-        }
-    }
 }
