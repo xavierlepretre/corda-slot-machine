@@ -31,7 +31,6 @@ object ForeClosureFlow {
                     .states.singleOrNull { it.state.data.linearId == gameId }
                     ?: throw FlowException("No game with id $gameId found.")
             val notary = gameStateAndRef.state.notary
-            // TODO improve the query to be more specific to deal with potential pagination issues
             val associatedRevealStates = serviceHub.vaultService.queryBy<RevealedState>().states
                     .filter { it.state.data.game.pointer == gameStateAndRef.ref }
             val associatedCommitStates = serviceHub.vaultService.queryBy<CommittedState>().states
@@ -60,36 +59,25 @@ object ForeClosureFlow {
                     .addInputState(gameRef)
                     .addCommand(GameContract.Commands.Close(0), ourIdentity.owningKey)
 
-            val otherParties = gameRef.state.data.participants
-                    .filter { it.owningKey != ourIdentity.owningKey }
-
-            val otherSessions = otherParties.map { initiateFlow(it) }
-
-            // We always have 2 commits by this stage
             if (commitRefs.isNotEmpty()) {
-                builder.addInputState(commitRefs.first())
-                builder.addCommand(Close(1), ourIdentity.owningKey)
-                builder.addInputState(commitRefs.last())
-                builder.addCommand(Close(2), ourIdentity.owningKey)
-            }
-
-            // We might have 1 or 2 commits by this stage
-            if (revealRefs.isNotEmpty()) {
-                when (revealRefs.size) {
-                    1 -> {
-                        builder.addInputState(revealRefs.first())
-                        builder.addCommand(Use(3), ourIdentity.owningKey)
-                    }
-                    2 -> {
-                        builder.addInputState(revealRefs.first())
-                        builder.addCommand(Use(3), ourIdentity.owningKey)
-                        builder.addInputState(revealRefs.last())
-                        builder.addCommand(Use(4), ourIdentity.owningKey)
-                    }
-                    else -> throw FlowException("There can only two be reveals for each game, but ${revealRefs.size} found.")
+                commitRefs.forEach {
+                    builder.addCommand(Close(builder.inputStates().size), ourIdentity.owningKey)
+                    builder.addInputState(it)
                 }
             }
+
+            if (revealRefs.isNotEmpty()) {
+                revealRefs.forEach {
+                    builder.addCommand(Use(builder.inputStates().size), ourIdentity.owningKey)
+                    builder.addInputState(it)
+                }
+            }
+
             builder.verify(serviceHub)
+
+            val otherParties = gameRef.state.data.participants
+                    .filter { it.owningKey != ourIdentity.owningKey }.distinct()
+            val otherSessions = otherParties.map { initiateFlow(it) }
 
             val signed = serviceHub.signInitialTransaction(builder, ourIdentity.owningKey)
             return subFlow(FinalityFlow(signed, otherSessions))
