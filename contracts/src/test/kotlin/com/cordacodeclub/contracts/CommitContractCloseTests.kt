@@ -54,6 +54,18 @@ class CommitContractCloseTests {
         verifies()
     }
 
+    private fun LedgerDSL<TestTransactionDSLInterpreter, TestLedgerDSLInterpreter>.reveal(
+            committedRef: StateAndRef<CommittedState>, image: CommitImage) = transaction {
+        val committed = committedRef.state.data
+        input(committedRef.ref)
+        output(CommitContract.id, RevealedState(image, committed.creator, committedRef.getGamePointer(),
+                committed.linearId))
+        command(committed.creator.owningKey, CommitContract.Commands.Reveal(0, 0))
+        reference(committedRef.getGamePointer().pointer)
+        timeWindow(TimeWindow.untilOnly(committed.revealDeadline))
+        verifies()
+    }
+
     //TODO fix failing test
 //    @Test
 //    fun `Close command needs a CommittedState state input`() {
@@ -76,13 +88,23 @@ class CommitContractCloseTests {
         ledgerServices.ledger {
             val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
             val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
+            val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
             transaction {
-                input(playerRef.ref)
-                reference(playerRef.getGamePointer().pointer)
-                timeWindow(TimeWindow.untilOnly(casinoRef.state.data.revealDeadline))
-
+                input(casinoRef.ref)
                 command(player.owningKey, CommitContract.Commands.Close(0))
-                command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Close(1))
+                input(playerRevealRef.ref)
+                command(player.owningKey, CommitContract.Commands.Use(1))
+                input(playerRef.getGamePointer().pointer)
+                command(player.owningKey, GameContract.Commands.Close(2))
+                input(lockedRef.ref)
+                output(LockableTokenContract.id,
+                        LockableTokenState(player, issuer, Amount(2L, LockableTokenType)))
+                output(LockableTokenContract.id,
+                        LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
+                command(player.owningKey, LockableTokenContract.Commands.Release(listOf(3), listOf(0, 1)))
+
+                timeWindow(TimeWindow.fromOnly(playerRef.state.data.revealDeadline.plusSeconds(1)))
                 verifies()
             }
         }
