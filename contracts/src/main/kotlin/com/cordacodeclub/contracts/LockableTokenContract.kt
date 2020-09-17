@@ -7,15 +7,12 @@ import net.corda.core.contracts.Amount
 import net.corda.core.contracts.CommandData
 import net.corda.core.contracts.Contract
 import net.corda.core.contracts.Requirements.using
-import net.corda.core.internal.toMultiMap
 import net.corda.core.transactions.LedgerTransaction
 
 class LockableTokenContract : Contract {
 
     companion object {
         val id = LockableTokenContract::class.java.canonicalName!!
-        const val inputsKey = 1
-        const val outputsKey = 2
     }
 
     interface HasInputs {
@@ -30,7 +27,7 @@ class LockableTokenContract : Contract {
         /**
          * An [Issue] indicates that unlocked tokens are created out thin air.
          */
-        class Issue(override val outputIndices: List<Int>) : Commands(), HasOutputs {
+        data class Issue(override val outputIndices: List<Int>) : Commands(), HasOutputs {
             init {
                 require(outputIndices.isNotEmpty()) { "Issue must have outputs" }
                 require(outputIndices.all { 0 <= it }) { "All output indices must be positive" }
@@ -42,8 +39,8 @@ class LockableTokenContract : Contract {
          * tokens in outputs than there are in inputs. This implies that there can be locked tokens in inputs and
          * unlocked tokens in outputs.
          */
-        class Lock(override val inputIndices: List<Int>,
-                   override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
+        data class Lock(override val inputIndices: List<Int>,
+                        override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
             init {
                 require(inputIndices.isNotEmpty()) { "Lock must have inputs" }
                 require(inputIndices.all { 0 <= it }) { "All input indices must be positive" }
@@ -57,8 +54,8 @@ class LockableTokenContract : Contract {
          * tokens in inputs than there are in outputs. This implies that there can be unlocked tokens in inputs and
          * locked tokens in outputs.
          */
-        class Release(override val inputIndices: List<Int>,
-                      override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
+        data class Release(override val inputIndices: List<Int>,
+                           override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
             init {
                 require(inputIndices.isNotEmpty()) { "Release must have inputs" }
                 require(inputIndices.all { 0 <= it }) { "All input indices must be positive" }
@@ -71,8 +68,8 @@ class LockableTokenContract : Contract {
          * A [Redeem] indicates that some of the inputs tokens are being destroyed. In effect that there are more tokens
          * in inputs than there an in outputs. It only deals with unlocked tokens.
          */
-        class Redeem(override val inputIndices: List<Int>,
-                     override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
+        data class Redeem(override val inputIndices: List<Int>,
+                          override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
             init {
                 require(inputIndices.isNotEmpty()) { "Redeem must have inputs" }
                 require(inputIndices.all { 0 <= it }) { "All input indices must be positive" }
@@ -83,9 +80,7 @@ class LockableTokenContract : Contract {
     }
 
     override fun verify(tx: LedgerTransaction) {
-        val commands = tx.commandsOfType<Commands>()
-
-        val coveredLockableStates = commands.flatMap { command ->
+        val commands = tx.commandsOfType<Commands>().map { command ->
 
             // Common tests
             val rawInputs = (command.value as? HasInputs)
@@ -177,18 +172,14 @@ class LockableTokenContract : Contract {
                 }
             }
 
-            val inputPairs = (command.value as? HasInputs)?.inputIndices
-                    ?.map { inputsKey to it }
-                    ?: listOf()
-            val outputPairs = (command.value as? HasOutputs)?.outputIndices
-                    ?.map { outputsKey to it }
-                    ?: listOf()
+            command.value
+        }
 
-            inputPairs.plus(outputPairs)
-        }.groupBy({ it.first }) { it.second }
-
-        val coveredInputs = coveredLockableStates[inputsKey] ?: listOf()
-        val coveredOutputs = coveredLockableStates[outputsKey] ?: listOf()
+        "The LockableTokenContract must find at least 1 command" using commands.isNotEmpty()
+        val coveredInputs = commands.filterIsInstance<HasInputs>()
+                .flatMap { it.inputIndices }
+        val coveredOutputs = commands.filterIsInstance<HasOutputs>()
+                .flatMap { it.outputIndices }
         "All covered token inputs must have no overlap" using (coveredInputs.distinct().size == coveredInputs.size)
         "All covered token outputs must have no overlap" using (coveredOutputs.distinct().size == coveredOutputs.size)
         val allLockableInputs = tx.inputStates

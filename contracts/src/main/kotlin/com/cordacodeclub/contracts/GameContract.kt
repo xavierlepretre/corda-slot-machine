@@ -1,10 +1,12 @@
 package com.cordacodeclub.contracts
 
 import com.cordacodeclub.states.*
-import net.corda.core.contracts.*
+import net.corda.core.contracts.CommandData
+import net.corda.core.contracts.Contract
+import net.corda.core.contracts.LinearState
 import net.corda.core.contracts.Requirements.using
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.AbstractParty
-import net.corda.core.internal.toMultiMap
 import net.corda.core.transactions.LedgerTransaction
 import java.security.PublicKey
 
@@ -12,8 +14,6 @@ class GameContract : Contract {
 
     companion object {
         val id = GameContract::class.java.canonicalName!!
-        const val inputsKey = 1
-        const val outputsKey = 2
     }
 
     override fun verify(tx: LedgerTransaction) {
@@ -39,33 +39,38 @@ class GameContract : Contract {
                     it.value.single()
                 }
 
-        val coveredStates = tx.commandsOfType<Commands>()
-                .also { require(it.isNotEmpty()) { "The GameContract must find at least 1 command" } }
-                .flatMap { command ->
-                    when (command.value) {
-                        is Commands.Create ->
-                            listOf(outputsKey to
-                                    verifyCreate(tx, command.value as Commands.Create, command.signers, outputIds).ref)
-                        is Commands.Resolve ->
-                            listOf(inputsKey to
-                                    verifyResolve(tx, command.value as Commands.Resolve, inputIds).ref)
-                    }
-                }
-                .toMultiMap()
-        requireThat {
-            "All input game states must have an associated command" using tx.inputs
-                    .filter { ref -> ref.state.data is GameState }
-                    .all { coveredStates[inputsKey]?.contains(it.ref) ?: false }
-            "All output game states must have an associated command" using tx.outputs
-                    .mapIndexedNotNull { index, state ->
-                        (state.data as? GameState)?.let { index }
-                    }
-                    .all { coveredStates[outputsKey]?.contains(StateRef(tx.id, it)) ?: false }
+        val commands = tx.commandsOfType<Commands>().map { command ->
+            when (command.value) {
+                is Commands.Create -> verifyCreate(tx, command.value as Commands.Create, command.signers, outputIds)
+                is Commands.Resolve -> verifyResolve(tx, command.value as Commands.Resolve, inputIds)
+            }
+            command.value
         }
+        "The GameContract must find at least 1 command" using commands.isNotEmpty()
+        val coveredInputs = commands.filterIsInstance<Commands.Resolve>()
+                .map { it.inputIndex }
+        val coveredOutputs = commands.filterIsInstance<Commands.Create>()
+                .map { it.outputIndex }
+        "All covered inputs must have no overlap" using (coveredInputs.distinct().size == coveredInputs.size)
+        "All covered outputs must have no overlap" using (coveredOutputs.distinct().size == coveredOutputs.size)
+        val allGameInputs = tx.inputStates
+                .mapIndexed { index, state -> index to state }
+                .filter { it.second is GameState }
+                .map { it.first }
+        "All input game states must have an associated command" using (
+                allGameInputs.size == coveredInputs.size
+                        && allGameInputs.all { coveredInputs.contains(it) })
+        val allGameOutputs = tx.outputStates
+                .mapIndexed { index, state -> index to state }
+                .filter { it.second is GameState }
+                .map { it.first }
+        "All output game states must have an associated command" using (
+                allGameOutputs.size == coveredOutputs.size
+                        && allGameOutputs.all { coveredOutputs.contains(it) })
     }
 
     private fun verifyCreate(tx: LedgerTransaction, create: Commands.Create, signers: List<PublicKey>,
-                             outputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>): StateAndRef<GameState> {
+                             outputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>) {
         "The output must be a GameState" using (tx.outputStates[create.outputIndex] is GameState)
         val gameRef = tx.outRef<GameState>(create.outputIndex)
         val gameState = gameRef.state.data
@@ -100,12 +105,10 @@ class GameContract : Contract {
         "The output locked token and the game must be mutually encumbered" using
                 (gameRef.state.encumbrance == gameState.lockedWagersOutputIndex
                         && lockedTokenRef.state.encumbrance == create.outputIndex)
-
-        return tx.outRef(create.outputIndex)
     }
 
     private fun verifyResolve(tx: LedgerTransaction, resolve: Commands.Resolve,
-                              inputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>): StateAndRef<GameState> {
+                              inputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>) {
         val gameRef = tx.inputs[resolve.inputIndex]
         "The input must be a GameState" using (gameRef.state.data is GameState)
         val gameState = gameRef.state.data as GameState
@@ -141,17 +144,16 @@ class GameContract : Contract {
         "The player payout should be correct" using (actualPlayerPayout == expectedPlayerPayout)
         "The casino payout should be correct" using
                 (actualCasinoPayout == (gameState.bettedAmount.quantity - expectedPlayerPayout))
-        return tx.inRef(resolve.inputIndex)
     }
 
     sealed class Commands : CommandData {
-        class Create(val outputIndex: Int) : Commands() {
+        data class Create(val outputIndex: Int) : Commands() {
             init {
                 require(0 <= outputIndex) { "Index must be positive" }
             }
         }
 
-        class Resolve(val inputIndex: Int) : Commands() {
+        data class Resolve(val inputIndex: Int) : Commands() {
             init {
                 require(0 <= inputIndex) { "Index must be positive" }
             }
