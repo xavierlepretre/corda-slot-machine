@@ -10,7 +10,7 @@ import java.security.PublicKey
 class GameContract : Contract {
 
     companion object {
-        val id = GameContract::class.java.canonicalName
+        val id = GameContract::class.java.canonicalName!!
         const val inputsKey = 1
         const val outputsKey = 2
     }
@@ -47,7 +47,7 @@ class GameContract : Contract {
                                     verifyCreate(tx, command.value as Commands.Create, command.signers, outputIds).ref)
                         is Commands.Resolve ->
                             listOf(inputsKey to
-                                    verifyResolve(tx, command.value as Commands.Resolve, command.signers, inputIds).ref)
+                                    verifyResolve(tx, command.value as Commands.Resolve, inputIds).ref)
                     }
                 }
                 .toMultiMap()
@@ -85,10 +85,9 @@ class GameContract : Contract {
                 .mapNotNull { (it?.second as? CommittedState)?.creator }
                 .distinct()
                 .size == 2)
-        "The game bettors must be signers" using listOf(gameState.casino, gameState.player)
+        "The game bettors must be signers" using (listOf(gameState.casino, gameState.player)
                 .map { it.committer.holder.owningKey }
-                .toSet()
-                .equals(signers.toSet())
+                .toSet() == signers.toSet())
         "The output locked token index must be possible" using (gameState.lockedWagersOutputIndex < tx.outputs.size)
         val lockedToken = tx.getOutput(gameState.lockedWagersOutputIndex)
                 .also { "There must be a LockableTokenState at the output index" using (it is LockableTokenState) }
@@ -104,7 +103,7 @@ class GameContract : Contract {
         return tx.outRef(create.outputIndex)
     }
 
-    private fun verifyResolve(tx: LedgerTransaction, resolve: Commands.Resolve, signers: List<PublicKey>,
+    private fun verifyResolve(tx: LedgerTransaction, resolve: Commands.Resolve,
                               inputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>): StateAndRef<GameState> {
         val gameRef = tx.inputs[resolve.inputIndex]
         "The input must be a GameState" using (gameRef.state.data is GameState)
@@ -126,22 +125,18 @@ class GameContract : Contract {
         val expectedPlayerPayout = Math.multiplyExact(
                 gameState.player.issuedAmount.amount.quantity,
                 CommitImage.playerPayoutCalculator(casinoImage, playerImage))
-        val actualCasinoPayout = tx.outputStates
-                .filterIsInstance<LockableTokenState>()
-                .filter { it.holder == gameState.casino.committer.holder && it.issuer == gameState.tokenIssuer }
-                .takeIf { it.isNotEmpty() }
-                ?.reduce(LockableTokenState::plus)
-                ?.amount
-                ?.quantity
-                ?: 0L
-        val actualPlayerPayout = tx.outputStates
-                .filterIsInstance<LockableTokenState>()
-                .filter { it.holder == gameState.player.committer.holder && it.issuer == gameState.tokenIssuer }
-                .takeIf { it.isNotEmpty() }
-                ?.reduce(LockableTokenState::plus)
-                ?.amount
-                ?.quantity
-                ?: 0L
+        val actualPayoutCalculator = { holder: AbstractParty ->
+            tx.outputStates
+                    .filterIsInstance<LockableTokenState>()
+                    .filter { it.holder == holder && it.issuer == gameState.tokenIssuer }
+                    .takeIf { it.isNotEmpty() }
+                    ?.reduce(LockableTokenState::plus)
+                    ?.amount
+                    ?.quantity
+                    ?: 0L
+        }
+        val actualCasinoPayout = actualPayoutCalculator(gameState.casino.committer.holder)
+        val actualPlayerPayout = actualPayoutCalculator(gameState.player.committer.holder)
         "The player payout should be correct" using (actualPlayerPayout == expectedPlayerPayout)
         "The casino payout should be correct" using
                 (actualCasinoPayout == (gameState.bettedAmount.quantity - expectedPlayerPayout))
@@ -149,7 +144,16 @@ class GameContract : Contract {
     }
 
     sealed class Commands : CommandData {
-        class Create(val outputIndex: Int) : Commands()
-        class Resolve(val inputIndex: Int) : Commands()
+        class Create(val outputIndex: Int) : Commands() {
+            init {
+                require(0 <= outputIndex) { "Index must be positive" }
+            }
+        }
+
+        class Resolve(val inputIndex: Int) : Commands() {
+            init {
+                require(0 <= inputIndex) { "Index must be positive" }
+            }
+        }
     }
 }

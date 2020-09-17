@@ -13,7 +13,7 @@ import net.corda.core.transactions.LedgerTransaction
 class LockableTokenContract : Contract {
 
     companion object {
-        val id = LockableTokenContract::class.java.canonicalName
+        val id = LockableTokenContract::class.java.canonicalName!!
         const val inputsKey = 1
         const val outputsKey = 2
     }
@@ -33,6 +33,7 @@ class LockableTokenContract : Contract {
         class Issue(override val outputIndices: List<Int>) : Commands(), HasOutputs {
             init {
                 require(outputIndices.isNotEmpty()) { "Issue must have outputs" }
+                require(outputIndices.all { 0 <= it }) { "All output indices must be positive" }
             }
         }
 
@@ -45,7 +46,9 @@ class LockableTokenContract : Contract {
                    override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
             init {
                 require(inputIndices.isNotEmpty()) { "Lock must have inputs" }
+                require(inputIndices.all { 0 <= it }) { "All input indices must be positive" }
                 require(outputIndices.isNotEmpty()) { "Lock must have outputs" }
+                require(outputIndices.all { 0 <= it }) { "All output indices must be positive" }
             }
         }
 
@@ -58,7 +61,9 @@ class LockableTokenContract : Contract {
                       override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
             init {
                 require(inputIndices.isNotEmpty()) { "Release must have inputs" }
+                require(inputIndices.all { 0 <= it }) { "All input indices must be positive" }
                 require(outputIndices.isNotEmpty()) { "Release must have outputs" }
+                require(outputIndices.all { 0 <= it }) { "All output indices must be positive" }
             }
         }
 
@@ -70,7 +75,9 @@ class LockableTokenContract : Contract {
                      override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
             init {
                 require(inputIndices.isNotEmpty()) { "Redeem must have inputs" }
+                require(inputIndices.all { 0 <= it }) { "All input indices must be positive" }
                 // There may be no outputs.
+                require(outputIndices.all { 0 <= it }) { "All output indices must be positive" }
             }
         }
     }

@@ -12,7 +12,7 @@ import java.security.PublicKey
 class CommitContract : Contract {
 
     companion object {
-        val id = CommitContract::class.java.canonicalName
+        val id = CommitContract::class.java.canonicalName!!
         const val inputsKey = 1
         const val outputsKey = 2
     }
