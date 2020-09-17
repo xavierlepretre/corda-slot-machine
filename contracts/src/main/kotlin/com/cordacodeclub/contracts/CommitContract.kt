@@ -122,20 +122,6 @@ class CommitContract : Contract {
             "The game must be in input" using tx.inputs
                     .map { it.ref }
                     .contains(revealedState.game.pointer)
-            @Suppress("UNCHECKED_CAST")
-            val game = tx.inputs
-                    .single { it.ref == revealedState.game.pointer } as StateAndRef<GameState>
-
-            "All the game commit ids must be present" using (game.state.data
-                    .let { listOf(it.casino, it.player) }
-                    .map { it.committer.linearId }
-                    .all {
-                        inputIds[it]?.let {
-                            (it.single() as? RevealedState)?.let {
-                                it.game.pointer == game.ref
-                            }
-                        } ?: false
-                    })
 
             // No signatures required as the winnings are calculated programmatically.
         }

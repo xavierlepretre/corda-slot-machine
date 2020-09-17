@@ -35,7 +35,6 @@ class CommitContractUseTests {
     private val casino = casinoId.identity.party
     private val playerId = TestIdentity(CordaX500Name("Player", "Paris", "FR"))
     private val player = playerId.identity.party
-    private val random = Random()
 
     private fun LedgerDSL<TestTransactionDSLInterpreter, TestLedgerDSLInterpreter>.issueTwoCommits(
             casinoHash: SecureHash, playerHash: SecureHash) = transaction {
@@ -127,34 +126,6 @@ class CommitContractUseTests {
                 failsWith("Missing required encumbrance 2")
 
                 input(casinoRef.getGamePointer().pointer)
-                verifies()
-            }
-        }
-    }
-
-    @Test
-    fun `Use must use all commits of game`() {
-        val casinoImage = CommitImage(BigInteger.valueOf(11L))
-        val playerImage = CommitImage(BigInteger.valueOf(12L)) // -> 0 payout
-        ledgerServices.ledger {
-            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
-            val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
-            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
-            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
-            val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
-            transaction {
-                input(casinoRevealRef.ref)
-                input(casinoRef.getGamePointer().pointer)
-                input(lockedRef.ref)
-                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(200L, LockableTokenType)))
-                command(casino.owningKey, Use(0))
-                command(player.owningKey, Resolve(1))
-                command(player.owningKey, Release(listOf(2), listOf(0)))
-
-                failsWith("All the game commit ids must be present")
-
-                input(playerRevealRef.ref)
-                command(player.owningKey, Use(3))
                 verifies()
             }
         }
