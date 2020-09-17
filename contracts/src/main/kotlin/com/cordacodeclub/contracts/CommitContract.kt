@@ -41,7 +41,7 @@ class CommitContract : Contract {
                         is Commands.Commit ->
                             listOf(outputsKey to verifyCommit(tx, command.value as Commands.Commit, command.signers, outputIds).ref)
                         is Commands.Reveal ->
-                            verifyReveal(tx, command.value as Commands.Reveal, command.signers)
+                            verifyReveal(tx, command.value as Commands.Reveal)
                                     .let { listOf(inputsKey to it.first.ref, outputsKey to it.second.ref) }
                         is Commands.Use ->
                             listOf(inputsKey to verifyUse(tx, command.value as Commands.Use, command.signers, inputIds).ref)
@@ -71,9 +71,9 @@ class CommitContract : Contract {
             val gameState = tx.outputStates[committedState.gameOutputIndex] as GameState
             "The game commit ids must all loop back" using (listOf(gameState.casino, gameState.player)
                     .map { it.committer.linearId }
-                    .all {
-                        outputIds[it]?.let {
-                            (it.single() as? CommittedState)?.let {
+                    .all { id ->
+                        outputIds[id]?.let { states ->
+                            (states.single() as? CommittedState)?.let {
                                 it.gameOutputIndex == committedState.gameOutputIndex
                             }
                         } ?: false
@@ -85,7 +85,7 @@ class CommitContract : Contract {
         return tx.outRef(commit.outputIndex)
     }
 
-    private fun verifyReveal(tx: LedgerTransaction, reveal: Commands.Reveal, signers: List<PublicKey>)
+    private fun verifyReveal(tx: LedgerTransaction, reveal: Commands.Reveal)
             : Pair<StateAndRef<CommittedState>, StateAndRef<RevealedState>> {
         requireThat {
             "The input must be a CommittedState" using (tx.inputs[reveal.inputIndex].state.data is CommittedState)
@@ -129,9 +129,24 @@ class CommitContract : Contract {
     }
 
     sealed class Commands : CommandData {
-        class Commit(val outputIndex: Int) : Commands()
-        class Reveal(val inputIndex: Int, val outputIndex: Int) : Commands()
-        class Use(val inputIndex: Int) : Commands()
+        class Commit(val outputIndex: Int) : Commands() {
+            init {
+                require(0 <= outputIndex) { "Index must be positive" }
+            }
+        }
+
+        class Reveal(val inputIndex: Int, val outputIndex: Int) : Commands() {
+            init {
+                require(0 <= outputIndex) { "Output index must be positive" }
+                require(0 <= inputIndex) { "Input index must be positive" }
+            }
+        }
+
+        class Use(val inputIndex: Int) : Commands() {
+            init {
+                require(0 <= inputIndex) { "Index must be positive" }
+            }
+        }
     }
 
 }

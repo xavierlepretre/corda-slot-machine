@@ -3,6 +3,7 @@ package com.cordacodeclub.contracts
 import com.cordacodeclub.states.*
 import net.corda.core.contracts.*
 import net.corda.core.contracts.Requirements.using
+import net.corda.core.identity.AbstractParty
 import net.corda.core.internal.toMultiMap
 import net.corda.core.transactions.LedgerTransaction
 import java.security.PublicKey
