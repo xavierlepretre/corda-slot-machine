@@ -18,14 +18,17 @@
   window.remaining_balance = 0;
 
   const gameType = "default"; // Modify on this line which game Type you'd like to show
+  const MIN_BET = 1;
+  const MAX_BET = 100;
   const ICONS_PER_REEL = 6;
+  const DEFAULT_TIMEOUT = 30000; // 30 seconds
 
   // this emulates Slots::GetGameSettings($gameType, true)
   function getGameSettings(gameType) {
     return {
       game_type: gameType,
-      min_bet: 1,
-      max_bet: 1,
+      min_bet: MIN_BET,
+      max_bet: MAX_BET,
       icons_per_reel: ICONS_PER_REEL,
     };
   }
@@ -185,13 +188,15 @@
         type: type,
         data: params,
         dataType: "json",
-        timeout: 10000,
+        timeout: DEFAULT_TIMEOUT,
         success: function (data) {
           fnSuccess(data);
         },
         error: function (jqXHR, textStatus, errorThrown) {
           const msg =
-            textStatus && errorThrown
+            jqXHR.responseText
+              ? jqXHR.responseText
+              : textStatus && errorThrown
               ? `${textStatus} -- ${errorThrown}`
               : textStatus
               ? textStatus
@@ -204,7 +209,7 @@
     }
 
     // in future there may be additional parameters e.g. for the size of the bet
-    function spin(fnSuccess, fnError) {
+    function spin(curBet, fnSuccess, fnError) {
       const onSuccess = (spinResult) => {
         if (!spinResult.success) {
           fnError();
@@ -217,7 +222,7 @@
           fnError();
         }
       };
-      ajaxRequest({ name: accountName }, "POST", "/spin", onSuccess, fnError);
+      ajaxRequest({ name: accountName, wager: curBet }, "POST", "/spin", onSuccess, fnError);
     }
 
     function create(accountName, fnSuccess, fnError) {

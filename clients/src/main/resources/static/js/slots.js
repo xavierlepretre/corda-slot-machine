@@ -267,7 +267,7 @@ SlotMachine.prototype.spin = function () {
   var fnError = function () {
     _this.handleServerError();
   };
-  window.ioServer.spin(fnAJAXRequestSuccess, fnError);
+  window.ioServer.spin(this.curBet, fnAJAXRequestSuccess, fnError);
 };
 
 // Called once the first reel needs to stop (first reel timeout has hit *and* we got our
