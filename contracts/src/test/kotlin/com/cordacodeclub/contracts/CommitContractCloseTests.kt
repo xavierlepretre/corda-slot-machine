@@ -36,7 +36,8 @@ class CommitContractCloseTests {
             casinoHash: SecureHash, playerHash: SecureHash) = transaction {
         val casinoId = UniqueIdentifier()
         val playerId = UniqueIdentifier()
-        val revealDeadline = Instant.now().plusSeconds(60)
+        val commitDeadline = Instant.now().plusSeconds(30)
+        val revealDeadline = commitDeadline.plusSeconds(30)
         input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
         input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(3L, LockableTokenType)))
         output(CommitContract.id, CommittedState(casinoHash, casino,
@@ -44,7 +45,7 @@ class CommitContractCloseTests {
         output(CommitContract.id, CommittedState(playerHash, player,
                 2, playerId))
         output(GameContract.id, 3, GameState(casino commitsTo casinoId with (398L issuedBy issuer),
-                player commitsTo playerId with (2L issuedBy issuer), revealDeadline, 3,
+                player commitsTo playerId with (2L issuedBy issuer), commitDeadline, revealDeadline, 3,
                 UniqueIdentifier(), listOf(casino, player)))
         output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(400L, LockableTokenType),
                 listOf(casino, player)))
@@ -54,6 +55,7 @@ class CommitContractCloseTests {
         command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(2))
         command(listOf(casino.owningKey, player.owningKey),
                 LockableTokenContract.Commands.Lock(listOf(0, 1), listOf(3, 4)))
+        timeWindow(TimeWindow.untilOnly(commitDeadline))
         verifies()
     }
 

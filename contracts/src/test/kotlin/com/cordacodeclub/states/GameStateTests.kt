@@ -21,11 +21,13 @@ class GameStateTests {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
                     bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
                     Instant.now().plusSeconds(60), 0,
                     UniqueIdentifier(), listOf())
         }
         GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
                 bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
                 Instant.now().plusSeconds(60), 0,
                 UniqueIdentifier(), listOf(alice))
     }
@@ -35,11 +37,13 @@ class GameStateTests {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy alice),
                     bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
                     Instant.now().plusSeconds(60), 1,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
                 bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
                 Instant.now().plusSeconds(60), 1,
                 UniqueIdentifier(), listOf(alice, bob))
     }
@@ -49,11 +53,13 @@ class GameStateTests {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
                     alice commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
                     Instant.now().plusSeconds(60), 2,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
                 bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
                 Instant.now().plusSeconds(60), 2,
                 UniqueIdentifier(), listOf(alice, bob))
     }
@@ -63,11 +69,13 @@ class GameStateTests {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
                     bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
                     Instant.now().plusSeconds(60), -1,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
                 bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
                 Instant.now().plusSeconds(60), 0,
                 UniqueIdentifier(), listOf(alice, bob))
     }
@@ -77,33 +85,39 @@ class GameStateTests {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio + 1L issuedBy issuer),
                     bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
                     Instant.now().plusSeconds(60), -1,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio - 1L issuedBy issuer),
                     bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
                     Instant.now().plusSeconds(60), -1,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (3 * GameState.maxPayoutRatio + 1L issuedBy issuer),
                     bob commitsTo UniqueIdentifier() with (3L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
                     Instant.now().plusSeconds(60), 0,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (3 * GameState.maxPayoutRatio - 1L issuedBy issuer),
                     bob commitsTo UniqueIdentifier() with (3L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
                     Instant.now().plusSeconds(60), 0,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
                 bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
                 Instant.now().plusSeconds(60), 0,
                 UniqueIdentifier(), listOf(alice, bob))
         GameState(alice commitsTo UniqueIdentifier() with (3 * GameState.maxPayoutRatio issuedBy issuer),
                 bob commitsTo UniqueIdentifier() with (3L issuedBy issuer),
+                Instant.now().plusSeconds(30),
                 Instant.now().plusSeconds(60), 0,
                 UniqueIdentifier(), listOf(alice, bob))
     }

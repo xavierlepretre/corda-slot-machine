@@ -93,7 +93,8 @@ object CommitFlows {
                     .addCommand(Command(Commit(1), setup.casino.owningKey))
                     .addOutputState(
                             GameState(setup.casinoCommittedBettor(casinoCommitId),
-                                    setup.playerCommittedBettor(playerCommitId), setup.revealDeadline, 3,
+                                    setup.playerCommittedBettor(playerCommitId),
+                                    setup.commitDeadline, setup.revealDeadline, 3,
                                     UniqueIdentifier(), listOf(setup.player, setup.casino)),
                             GameContract.id, notary, 3)
                     .addCommand(Create(2), listOf(setup.casino.owningKey, setup.player.owningKey))
@@ -262,7 +263,7 @@ object CommitFlows {
                         throw FlowException("The game casino issuer should be the expected issuer")
                     if (gameState.casino.issuedAmount.amount.quantity != setup.casinoWager)
                         throw FlowException("The casino amount should be the expected ratio with the player amount")
-                    if (gameState.revealDeadline != setup.revealDeadline )
+                    if (gameState.revealDeadline != setup.revealDeadline)
                         throw FlowException("The game revealDeadline should be the expected deadline")
 
                     val myLockCommand = myCommands

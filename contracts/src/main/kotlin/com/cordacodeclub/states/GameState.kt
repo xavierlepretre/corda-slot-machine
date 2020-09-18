@@ -18,6 +18,7 @@ import java.time.Instant
 data class GameState(
         val casino: CommittedBettor,
         val player: CommittedBettor,
+        val commitDeadline: Instant,
         val revealDeadline: Instant,
         val lockedWagersOutputIndex: Int,
         override val linearId: UniqueIdentifier,
