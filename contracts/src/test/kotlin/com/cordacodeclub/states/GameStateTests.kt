@@ -65,6 +65,30 @@ class GameStateTests {
     }
 
     @Test
+    fun `GameState commit deadline must come before reveal deadline`() {
+        val pointInTime = Instant.now()
+        assertFailsWith<IllegalArgumentException> {
+            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    pointInTime.plusSeconds(30),
+                    pointInTime.plusSeconds(29), 0,
+                    UniqueIdentifier(), listOf(alice, bob))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    pointInTime.plusSeconds(30),
+                    pointInTime.plusSeconds(30), 0,
+                    UniqueIdentifier(), listOf(alice, bob))
+        }
+        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                pointInTime.plusSeconds(30),
+                pointInTime.plusSeconds(31), 0,
+                UniqueIdentifier(), listOf(alice, bob))
+    }
+
+    @Test
     fun `GameState locked wagers output index must be positive`() {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
