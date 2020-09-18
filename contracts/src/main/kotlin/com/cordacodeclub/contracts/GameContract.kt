@@ -77,6 +77,10 @@ class GameContract : Contract {
         val gameState = gameRef.state.data
         val associatedCommits = listOf(gameState.casino, gameState.player)
                 .map { outputIds[it.committer.linearId] }
+        "The commit deadline must be satisfied" using (tx.timeWindow
+                ?.untilTime
+                ?.let { gameState.commitDeadline <= it }
+                ?: false)
         "The commit ids must all be associated CommittedStates" using associatedCommits.all { pair ->
             pair?.let { (commitIndex, linearState) ->
                 linearState is CommittedState
@@ -84,10 +88,6 @@ class GameContract : Contract {
                         && tx.outputs[commitIndex].contract == CommitContract.id
             } ?: false
         }
-        "The commits must all have the same reveal deadline" using (associatedCommits
-                .mapNotNull { (it?.second as? CommittedState)?.revealDeadline }
-                .distinct()
-                .size == 1)
         "The game bettors must all have commits" using (associatedCommits
                 .mapNotNull { (it?.second as? CommittedState)?.creator }
                 .distinct()

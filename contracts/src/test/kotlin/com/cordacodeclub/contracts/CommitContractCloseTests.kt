@@ -1,7 +1,10 @@
 package com.cordacodeclub.contracts
 
 import com.cordacodeclub.states.*
-import net.corda.core.contracts.*
+import net.corda.core.contracts.Amount
+import net.corda.core.contracts.StateAndRef
+import net.corda.core.contracts.TimeWindow
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.common.internal.testNetworkParameters
@@ -33,15 +36,16 @@ class CommitContractCloseTests {
             casinoHash: SecureHash, playerHash: SecureHash) = transaction {
         val casinoId = UniqueIdentifier()
         val playerId = UniqueIdentifier()
-        val revealDeadline = Instant.now().plusSeconds(60)
+        val commitDeadline = Instant.now().plusSeconds(30)
+        val revealDeadline = commitDeadline.plusSeconds(30)
         input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
         input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(3L, LockableTokenType)))
         output(CommitContract.id, CommittedState(casinoHash, casino,
-                revealDeadline, 2, casinoId))
+                2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
-                revealDeadline, 2, playerId))
+                2, playerId))
         output(GameContract.id, 3, GameState(casino commitsTo casinoId with (398L issuedBy issuer),
-                player commitsTo playerId with (2L issuedBy issuer), 3,
+                player commitsTo playerId with (2L issuedBy issuer), commitDeadline, revealDeadline, 3,
                 UniqueIdentifier(), listOf(casino, player)))
         output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(400L, LockableTokenType),
                 listOf(casino, player)))
@@ -51,18 +55,21 @@ class CommitContractCloseTests {
         command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(2))
         command(listOf(casino.owningKey, player.owningKey),
                 LockableTokenContract.Commands.Lock(listOf(0, 1), listOf(3, 4)))
+        timeWindow(TimeWindow.untilOnly(commitDeadline))
         verifies()
     }
 
     private fun LedgerDSL<TestTransactionDSLInterpreter, TestLedgerDSLInterpreter>.reveal(
-            committedRef: StateAndRef<CommittedState>, image: CommitImage) = transaction {
+            committedRef: StateAndRef<CommittedState>, image: CommitImage,
+            gameRef: StateAndRef<GameState>) = transaction {
+        require(gameRef.ref == committedRef.getGamePointer().pointer) { "Wrong gameRef" }
         val committed = committedRef.state.data
         input(committedRef.ref)
         output(CommitContract.id, RevealedState(image, committed.creator, committedRef.getGamePointer(),
                 committed.linearId))
         command(committed.creator.owningKey, CommitContract.Commands.Reveal(0, 0))
-        reference(committedRef.getGamePointer().pointer)
-        timeWindow(TimeWindow.untilOnly(committed.revealDeadline))
+        reference(gameRef.ref)
+        timeWindow(TimeWindow.untilOnly(gameRef.state.data.revealDeadline))
         verifies()
     }
 
@@ -88,8 +95,9 @@ class CommitContractCloseTests {
         ledgerServices.ledger {
             val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
             val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
+            val (gameRef) = issueTx.outRefsOfType<GameState>()
             val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
-            val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef, playerImage, gameRef).outRefsOfType<RevealedState>()
             transaction {
                 input(casinoRef.ref)
                 command(player.owningKey, CommitContract.Commands.Close(0))
@@ -104,7 +112,7 @@ class CommitContractCloseTests {
                         LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
                 command(player.owningKey, LockableTokenContract.Commands.Release(listOf(3), listOf(0, 1)))
 
-                timeWindow(TimeWindow.fromOnly(playerRef.state.data.revealDeadline.plusSeconds(1)))
+                timeWindow(TimeWindow.fromOnly(gameRef.state.data.revealDeadline.plusSeconds(1)))
                 verifies()
             }
         }

@@ -8,7 +8,6 @@ import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.core.TestIdentity
 import org.junit.Test
-import java.time.Instant
 import java.util.*
 import kotlin.test.assertFailsWith
 
@@ -25,12 +24,12 @@ class CommitStatesTests {
     @Test
     fun `CommittedState creator must be in the participants`() {
         assertFailsWith<IllegalArgumentException> {
-            CommittedState(SecureHash.allOnesHash, alice, Instant.now(), 1, UniqueIdentifier(), listOf())
+            CommittedState(SecureHash.allOnesHash, alice, 1, UniqueIdentifier(), listOf())
         }
         assertFailsWith<IllegalArgumentException> {
-            CommittedState(SecureHash.allOnesHash, alice, Instant.now(), 1, UniqueIdentifier(), listOf(bob))
+            CommittedState(SecureHash.allOnesHash, alice, 1, UniqueIdentifier(), listOf(bob))
         }
-        CommittedState(SecureHash.allOnesHash, alice, Instant.now(), 1, UniqueIdentifier(), listOf(alice))
+        CommittedState(SecureHash.allOnesHash, alice, 1, UniqueIdentifier(), listOf(alice))
     }
 
     @Test

@@ -85,15 +85,16 @@ object CommitFlows {
             val playerCommitId = UniqueIdentifier()
             val casinoCommitId = UniqueIdentifier()
             val builder = TransactionBuilder(notary)
-                    .addOutputState(CommittedState(playerHash, setup.player, setup.revealDeadline, 2,
-                            playerCommitId, listOf(setup.player)))
+                    .addOutputState(CommittedState(playerHash, setup.player, 2, playerCommitId,
+                            listOf(setup.player)))
                     .addCommand(Command(Commit(0), setup.player.owningKey))
-                    .addOutputState(CommittedState(casinoHash, setup.casino, setup.revealDeadline, 2,
-                            casinoCommitId, listOf(setup.player, setup.casino)))
+                    .addOutputState(CommittedState(casinoHash, setup.casino, 2, casinoCommitId,
+                            listOf(setup.player, setup.casino)))
                     .addCommand(Command(Commit(1), setup.casino.owningKey))
                     .addOutputState(
                             GameState(setup.casinoCommittedBettor(casinoCommitId),
-                                    setup.playerCommittedBettor(playerCommitId), 3,
+                                    setup.playerCommittedBettor(playerCommitId),
+                                    setup.commitDeadline, setup.revealDeadline, 3,
                                     UniqueIdentifier(), listOf(setup.player, setup.casino)),
                             GameContract.id, notary, 3)
                     .addCommand(Create(2), listOf(setup.casino.owningKey, setup.player.owningKey))
@@ -239,8 +240,6 @@ object CommitFlows {
                         throw FlowException("My commit state should have the hash I sent")
                     if (stx.tx.outRefsOfType<CommittedState>().size < minCommits)
                         throw FlowException("There should be at least $minCommits commits")
-                    if (stx.tx.outputsOfType(CommittedState::class.java).any { it.revealDeadline != setup.revealDeadline })
-                        throw FlowException("One CommittedState does not have the correct reveal deadline")
                     if (stx.tx.timeWindow != TimeWindow.untilOnly(setup.commitDeadline))
                         throw FlowException("The time-window is incorrect")
 
@@ -264,6 +263,8 @@ object CommitFlows {
                         throw FlowException("The game casino issuer should be the expected issuer")
                     if (gameState.casino.issuedAmount.amount.quantity != setup.casinoWager)
                         throw FlowException("The casino amount should be the expected ratio with the player amount")
+                    if (gameState.revealDeadline != setup.revealDeadline)
+                        throw FlowException("The game revealDeadline should be the expected deadline")
 
                     val myLockCommand = myCommands
                             .mapNotNull { it.value as? Lock }
