@@ -103,12 +103,13 @@ class CommitContract : Contract {
         "The creator must be unchanged" using (committedState.creator == revealedState.creator)
         "The game pointer must be unchanged" using (committedRef.getGamePointer() == revealedState.game)
 
-        "The game must be referenced" using tx.referenceInputRefsOfType<GameState>()
-                .any { it.ref == committedRef.getGamePointer().pointer }
+        val gameRef =  tx.referenceInputRefsOfType<GameState>()
+                .singleOrNull { it.ref == committedRef.getGamePointer().pointer }
+        "The game must be referenced" using (gameRef != null)
 
         "The reveal deadline must be satisfied" using
                 (tx.timeWindow?.untilTime != null
-                        && tx.timeWindow?.untilTime!! <= committedState.revealDeadline)
+                        && tx.timeWindow?.untilTime!! <= gameRef!!.state.data.revealDeadline)
         // No signatures required
     }
 
@@ -128,10 +129,11 @@ class CommitContract : Contract {
             @Suppress("UNCHECKED_CAST")
             val committedStateAndRef = tx.inputs[close.inputIndex] as StateAndRef<CommittedState>
             val committedState = committedStateAndRef.state.data
-//            "The game must be referenced" using tx.referenceInputRefsOfType<GameState>()
-//                    .any { it.ref == committedStateAndRef.getGamePointer().pointer }
-            "The reveal deadline must be satisfied" using (tx.timeWindow?.fromTime != null
-                    && committedState.revealDeadline < tx.timeWindow?.fromTime!!)
+            val gameRef = tx.referenceInputRefsOfType<GameState>()
+                    .singleOrNull { it.ref == committedStateAndRef.getGamePointer().pointer }
+//            "The game must be referenced" using (gameRef != null)
+//            "The reveal deadline must be satisfied" using (tx.timeWindow?.fromTime != null
+//                    && gameRef!!.state.data.revealDeadline < tx.timeWindow?.fromTime!!)
             return tx.inRef(close.inputIndex)
         }
     }

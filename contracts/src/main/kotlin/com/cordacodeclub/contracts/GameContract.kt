@@ -84,10 +84,6 @@ class GameContract : Contract {
                         && tx.outputs[commitIndex].contract == CommitContract.id
             } ?: false
         }
-        "The commits must all have the same reveal deadline" using (associatedCommits
-                .mapNotNull { (it?.second as? CommittedState)?.revealDeadline }
-                .distinct()
-                .size == 1)
         "The game bettors must all have commits" using (associatedCommits
                 .mapNotNull { (it?.second as? CommittedState)?.creator }
                 .distinct()

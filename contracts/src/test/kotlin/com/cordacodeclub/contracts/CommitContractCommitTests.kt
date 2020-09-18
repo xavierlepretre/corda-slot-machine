@@ -38,13 +38,13 @@ class CommitContractCommitTests {
             input(LockableTokenContract.id, LockableTokenState(player, issuer,
                     Amount(GameState.maxPayoutRatio + 2L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    revealDeadline, 2, casinoId))
+                    2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                    revealDeadline, 2, playerId))
+                    2, playerId))
             output(GameContract.id, 3,
                     GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 3,
-                    UniqueIdentifier(), listOf(casino)))
+                            player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 3,
+                            UniqueIdentifier(), listOf(casino)))
             output(LockableTokenContract.id, 2, LockableTokenState(issuer,
                     Amount(200L, LockableTokenType), listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
@@ -66,11 +66,11 @@ class CommitContractCommitTests {
             val revealDeadline = Instant.now().plusSeconds(60)
             input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    revealDeadline, 2, casinoId))
+                    2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                    revealDeadline, 2, playerId))
+                    2, playerId))
             output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 3,
+                    player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 3,
                     UniqueIdentifier(), listOf(casino)))
             output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
@@ -97,11 +97,11 @@ class CommitContractCommitTests {
             val revealDeadline = Instant.now().plusSeconds(60)
             input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    revealDeadline, 2, casinoId))
+                    2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                    revealDeadline, 2, playerId))
+                    2, playerId))
             output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 3,
+                    player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 3,
                     UniqueIdentifier(), listOf(casino)))
             output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
@@ -142,32 +142,32 @@ class CommitContractCommitTests {
 
             tweak {
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                        revealDeadline, -1, casinoId))
+                        -1, casinoId))
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                        revealDeadline, 4, playerId))
+                        4, playerId))
                 output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                        player commitsTo playerId with (1L issuedBy issuer), 0,
+                        player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 0,
                         UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game output index must be possible")
             }
 
             tweak {
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                        revealDeadline, 5, casinoId))
+                        5, casinoId))
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                        revealDeadline, 4, playerId))
+                        4, playerId))
                 output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                        player commitsTo playerId with (1L issuedBy issuer), 0,
+                        player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 0,
                         UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game output index must be possible")
             }
 
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    revealDeadline, 4, casinoId))
+                    4, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                    revealDeadline, 4, playerId))
+                    4, playerId))
             output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 0,
+                    player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 0,
                     UniqueIdentifier(), listOf(casino, player)))
             verifies()
         }
@@ -190,21 +190,21 @@ class CommitContractCommitTests {
 
             tweak {
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                        revealDeadline, 3, casinoId))
+                        3, casinoId))
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                        revealDeadline, 4, playerId))
+                        4, playerId))
                 output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                        player commitsTo playerId with (1L issuedBy issuer), 0,
+                        player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 0,
                         UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game output must be at the right index")
             }
 
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    revealDeadline, 4, casinoId))
+                    4, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                    revealDeadline, 4, playerId))
+                    4, playerId))
             output(GameContract.id, 0, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 0,
+                    player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 0,
                     UniqueIdentifier(), listOf(casino, player)))
             verifies()
         }
@@ -218,7 +218,7 @@ class CommitContractCommitTests {
             val revealDeadline = Instant.now().plusSeconds(60)
             input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(GameContract.id, 1, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 1,
+                    player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 1,
                     UniqueIdentifier(), listOf(casino, player)))
             output(LockableTokenContract.id, 0, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
@@ -228,14 +228,14 @@ class CommitContractCommitTests {
             command(casino.owningKey, Commit(3))
             command(player.owningKey, Commit(4))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    revealDeadline, 0, casinoId))
+                    0, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                    revealDeadline, 0, playerId))
+                    0, playerId))
             verifies()
 
             tweak {
                 output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                        revealDeadline, 0, casinoId))
+                        0, casinoId))
                 failsWith("There is more than 1 output state with a given id")
             }
 
@@ -250,12 +250,12 @@ class CommitContractCommitTests {
             val revealDeadline = Instant.now().plusSeconds(60)
             input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 3,
+                    player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 3,
                     UniqueIdentifier(), listOf(casino, player)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    revealDeadline, 0, casinoId))
+                    0, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                    revealDeadline, 0, playerId))
+                    0, playerId))
             output(LockableTokenContract.id, 0, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
@@ -277,9 +277,9 @@ class CommitContractCommitTests {
             val revealDeadline = Instant.now().plusSeconds(60)
             input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    revealDeadline, 4, casinoId))
+                    4, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                    revealDeadline, 4, playerId))
+                    4, playerId))
             output(LockableTokenContract.id, 4, LockableTokenState(issuer,
                     Amount(200L, LockableTokenType), listOf(player, casino)))
             output(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(1L, LockableTokenType)))
@@ -290,13 +290,13 @@ class CommitContractCommitTests {
 
             tweak {
                 output(GameContract.id, 2, GameState(casino commitsTo UniqueIdentifier() with (199L issuedBy issuer),
-                        player commitsTo playerId with (1L issuedBy issuer), 2,
+                        player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 2,
                         UniqueIdentifier(), listOf(casino, player)))
                 failsWith("The game commit ids must all loop back")
             }
 
             output(GameContract.id, 2, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 2,
+                    player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 2,
                     UniqueIdentifier(), listOf(casino, player)))
             verifies()
 
@@ -311,11 +311,11 @@ class CommitContractCommitTests {
             val revealDeadline = Instant.now().plusSeconds(60)
             input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(201L, LockableTokenType)))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-                    revealDeadline, 2, casinoId))
+                    2, casinoId))
             output(CommitContract.id, CommittedState(SecureHash.randomSHA256(), player,
-                    revealDeadline, 2, playerId))
+                    2, playerId))
             output(GameContract.id, 3, GameState(casino commitsTo casinoId with (199L issuedBy issuer),
-                    player commitsTo playerId with (1L issuedBy issuer), 3,
+                    player commitsTo playerId with (1L issuedBy issuer), revealDeadline, 3,
                     UniqueIdentifier(), listOf(casino, player)))
             output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(200L, LockableTokenType),
                     listOf(player, casino)))

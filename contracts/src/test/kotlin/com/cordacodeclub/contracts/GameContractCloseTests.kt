@@ -35,11 +35,11 @@ class GameContractCloseTests {
         input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
         input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(3L, LockableTokenType)))
         output(CommitContract.id, CommittedState(casinoHash, casino,
-                revealDeadline, 2, casinoId))
+                2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
-                revealDeadline, 2, playerId))
+                2, playerId))
         output(GameContract.id, 3, GameState(casino commitsTo casinoId with (398L issuedBy issuer),
-                player commitsTo playerId with (2L issuedBy issuer), 3,
+                player commitsTo playerId with (2L issuedBy issuer), revealDeadline, 3,
                 UniqueIdentifier(), listOf(casino, player)))
         output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(400L, LockableTokenType),
                 listOf(casino, player)))

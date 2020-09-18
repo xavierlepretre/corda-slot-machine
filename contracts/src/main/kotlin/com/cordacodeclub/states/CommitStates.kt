@@ -6,14 +6,12 @@ import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.AbstractParty
 import net.corda.core.serialization.CordaSerializable
 import java.math.BigInteger
-import java.time.Instant
 import java.util.*
 
 @BelongsToContract(CommitContract::class)
 data class CommittedState(
         val hash: SecureHash,
         val creator: AbstractParty,
-        val revealDeadline: Instant,
         val gameOutputIndex: Int, // Because it comes in the same tx, it cannot use a StaticPointer
         override val linearId: UniqueIdentifier,
         override val participants: List<AbstractParty> = listOf(creator)
