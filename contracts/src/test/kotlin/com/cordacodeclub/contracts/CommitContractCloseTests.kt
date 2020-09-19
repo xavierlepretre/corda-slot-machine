@@ -73,20 +73,40 @@ class CommitContractCloseTests {
         verifies()
     }
 
-    //TODO fix failing test
-//    @Test
-//    fun `Close command needs a CommittedState state input`() {
-//        ledgerServices.transaction {
-//            val casinoId = UniqueIdentifier()
-//            val revealDeadline = Instant.now().plusSeconds(60)
-//            input(CommitContract.id, CommittedState(SecureHash.randomSHA256(), casino,
-//                    revealDeadline, 2, casinoId))
-//            input(DummyContract.PROGRAM_ID, DummyState())
-//            command(player.owningKey, DummyCommandData)
-//            command(player.owningKey, CommitContract.Commands.Close(1))
-//            failsWith("The input must be a CommitState")
-//        }
-//    }
+    @Test
+    fun `Close command needs a CommittedState input`() {
+        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+        val playerImage = CommitImage(BigInteger.valueOf(12L))
+        ledgerServices.ledger {
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
+            val (gameRef) = issueTx.outRefsOfType<GameState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
+            val (playerRevealRef) = reveal(playerRef, playerImage, gameRef).outRefsOfType<RevealedState>()
+            transaction {
+                input(casinoRef.ref)
+                input(playerRevealRef.ref)
+                command(player.owningKey, CommitContract.Commands.Use(1))
+                input(gameRef.ref)
+                command(player.owningKey, GameContract.Commands.Close(2))
+                input(lockedRef.ref)
+                output(LockableTokenContract.id,
+                        LockableTokenState(player, issuer, Amount(2L, LockableTokenType)))
+                output(LockableTokenContract.id,
+                        LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
+                command(player.owningKey, LockableTokenContract.Commands.Release(listOf(3), listOf(0, 1)))
+                timeWindow(TimeWindow.fromOnly(gameRef.state.data.revealDeadline.plusSeconds(1)))
+
+                tweak {
+                    command(player.owningKey, CommitContract.Commands.Close(1))
+                    failsWith("Failed requirement: The input must be a CommittedState")
+                }
+
+                command(player.owningKey, CommitContract.Commands.Close(0))
+                verifies()
+            }
+        }
+    }
 
     @Test
     fun `Close command passes contract with 1 commit`() {
@@ -103,7 +123,7 @@ class CommitContractCloseTests {
                 command(player.owningKey, CommitContract.Commands.Close(0))
                 input(playerRevealRef.ref)
                 command(player.owningKey, CommitContract.Commands.Use(1))
-                input(playerRef.getGamePointer().pointer)
+                input(gameRef.ref)
                 command(player.owningKey, GameContract.Commands.Close(2))
                 input(lockedRef.ref)
                 output(LockableTokenContract.id,
@@ -117,4 +137,49 @@ class CommitContractCloseTests {
             }
         }
     }
+
+    //TODO fix failing test
+//    @Test
+//    fun `Close command needs a GameState input`() {
+//        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+//        val casinoImage2 = CommitImage(BigInteger.valueOf(11L))
+//        val playerImage = CommitImage(BigInteger.valueOf(12L))
+//        val playerImage2 = CommitImage(BigInteger.valueOf(12L))
+//        ledgerServices.ledger {
+//            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+//            val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
+//            val (gameRef) = issueTx.outRefsOfType<GameState>()
+//            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
+//            val (playerRevealRef) = reveal(playerRef, playerImage, gameRef).outRefsOfType<RevealedState>()
+//
+//            val issueTx2 = issueTwoCommits(casinoImage2.hash, playerImage2.hash)
+//            val (gameRef2) = issueTx2.outRefsOfType<GameState>()
+//            val (lockedRef2) = issueTx2.outRefsOfType<LockableTokenState>()
+//            transaction {
+//                input(casinoRef.ref)
+//                command(player.owningKey, CommitContract.Commands.Close(0))
+//                input(playerRevealRef.ref)
+//                command(player.owningKey, CommitContract.Commands.Use(1))
+//
+//                input(gameRef2.ref)
+//                command(player.owningKey, GameContract.Commands.Close(2))
+//                input(lockedRef2.ref)
+//
+//                input(lockedRef.ref)
+//                output(LockableTokenContract.id,
+//                        LockableTokenState(player, issuer, Amount(2L, LockableTokenType)))
+//                output(LockableTokenContract.id,
+//                        LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
+//                command(player.owningKey, LockableTokenContract.Commands.Release(listOf(3), listOf(0, 1)))
+//                timeWindow(TimeWindow.fromOnly(gameRef.state.data.revealDeadline.plusSeconds(1)))
+//
+//                tweak {
+//                    failsWith("Failed requirement: The game must be referenced")
+//                }
+//
+//                input(gameRef.ref)
+//                verifies()
+//            }
+//        }
+//    }
 }

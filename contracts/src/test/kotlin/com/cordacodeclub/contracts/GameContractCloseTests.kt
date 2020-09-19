@@ -2,6 +2,8 @@ package com.cordacodeclub.contracts
 
 import com.cordacodeclub.states.*
 import net.corda.core.contracts.Amount
+import net.corda.core.contracts.StateAndRef
+import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.CordaX500Name
@@ -11,6 +13,9 @@ import net.corda.testing.dsl.LedgerDSL
 import net.corda.testing.dsl.TestLedgerDSLInterpreter
 import net.corda.testing.dsl.TestTransactionDSLInterpreter
 import net.corda.testing.node.MockServices
+import net.corda.testing.node.ledger
+import org.junit.Test
+import java.math.BigInteger
 import java.time.Instant
 
 class GameContractCloseTests {
@@ -50,35 +55,58 @@ class GameContractCloseTests {
         command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Create(2))
         command(listOf(casino.owningKey, player.owningKey),
                 LockableTokenContract.Commands.Lock(listOf(0, 1), listOf(3, 4)))
+        timeWindow(TimeWindow.untilOnly(commitDeadline))
         verifies()
     }
 
-    //TODO fix failing test
-//    @Test
-//    fun `Close command needs a Game state input`() {
-//        val casinoImage = CommitImage(BigInteger.valueOf(11L))
-//        val playerImage = CommitImage(BigInteger.valueOf(12L))
-//        ledgerServices.ledger {
-//            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
-//            val (playerRef) = issueTx.outRefsOfType<CommittedState>()
-//            val (gameRef) = issueTx.outRefsOfType<GameState>()
-//            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
-//            transaction {
-//                input(playerRef.ref)
-//                command(player.owningKey, CommitContract.Commands.Close(0))
-//                input(lockedRef.ref)
-//                output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(400L, LockableTokenType)))
-//                command(player.owningKey, LockableTokenContract.Commands.Release(listOf(1), listOf(0)))
-//                input(gameRef.ref)
-//
-//                tweak {
-//                    command(player.owningKey, GameContract.Commands.Close(0))
-//                    failsWith("The input must be a GameState")
-//                }
-//
-//                command(listOf(casino.owningKey, player.owningKey), GameContract.Commands.Close(2))
-//                verifies()
-//            }
-//        }
-//    }
+    private fun LedgerDSL<TestTransactionDSLInterpreter, TestLedgerDSLInterpreter>.reveal(
+            committedRef: StateAndRef<CommittedState>, image: CommitImage,
+            gameRef: StateAndRef<GameState>) = transaction {
+        require(gameRef.ref == committedRef.getGamePointer().pointer) { "Wrong gameRef" }
+        val committed = committedRef.state.data
+        input(committedRef.ref)
+        output(CommitContract.id, RevealedState(image, committed.creator, committedRef.getGamePointer(),
+                committed.linearId))
+        command(committed.creator.owningKey, CommitContract.Commands.Reveal(0, 0))
+        reference(gameRef.ref)
+        timeWindow(TimeWindow.untilOnly(gameRef.state.data.revealDeadline))
+        verifies()
+    }
+
+    @Test
+    fun `Close command needs a Game state input`() {
+        val casinoImage = CommitImage(BigInteger.valueOf(11L))
+        val playerImage = CommitImage(BigInteger.valueOf(12L))
+        ledgerServices.ledger {
+            val issueTx = issueTwoCommits(casinoImage.hash, playerImage.hash)
+            val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
+            val (gameRef) = issueTx.outRefsOfType<GameState>()
+            val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
+            val (playerRevealRef) = reveal(playerRef, playerImage, gameRef).outRefsOfType<RevealedState>()
+            transaction {
+                input(casinoRef.ref)
+                command(player.owningKey, CommitContract.Commands.Close(0))
+                input(playerRevealRef.ref)
+                command(player.owningKey, CommitContract.Commands.Use(1))
+                input(gameRef.ref)
+
+                input(lockedRef.ref)
+                output(LockableTokenContract.id,
+                        LockableTokenState(player, issuer, Amount(2L, LockableTokenType)))
+                output(LockableTokenContract.id,
+                        LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
+                command(player.owningKey, LockableTokenContract.Commands.Release(listOf(3), listOf(0, 1)))
+                timeWindow(TimeWindow.fromOnly(gameRef.state.data.revealDeadline.plusSeconds(1)))
+
+                tweak {
+                    command(player.owningKey, GameContract.Commands.Close(1))
+                    failsWith("Failed requirement: The input must be a GameState")
+                }
+
+                command(player.owningKey, GameContract.Commands.Close(2))
+
+                verifies()
+            }
+        }
+    }
 }

@@ -128,12 +128,11 @@ class CommitContract : Contract {
             "The input must be a CommittedState" using (tx.inputs[close.inputIndex].state.data is CommittedState)
             @Suppress("UNCHECKED_CAST")
             val committedStateAndRef = tx.inputs[close.inputIndex] as StateAndRef<CommittedState>
-            val committedState = committedStateAndRef.state.data
-            val gameRef = tx.referenceInputRefsOfType<GameState>()
+            val gameRef = tx.inRefsOfType<GameState>()
                     .singleOrNull { it.ref == committedStateAndRef.getGamePointer().pointer }
-//            "The game must be referenced" using (gameRef != null)
-//            "The reveal deadline must be satisfied" using (tx.timeWindow?.fromTime != null
-//                    && gameRef!!.state.data.revealDeadline < tx.timeWindow?.fromTime!!)
+            "The game must be referenced" using (gameRef != null)
+            "The reveal deadline must be satisfied" using (tx.timeWindow?.fromTime != null
+                    && gameRef!!.state.data.revealDeadline < tx.timeWindow?.fromTime!!)
             return tx.inRef(close.inputIndex)
         }
     }

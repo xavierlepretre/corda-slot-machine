@@ -52,7 +52,7 @@ object ForeClosureFlow {
             val gameStateAndRef = serviceHub.vaultService
                     .queryBy(GameState::class.java, QueryCriteria.LinearStateQueryCriteria().withUuid(listOf(gameId.id)))
                     .states.singleOrNull { it.state.data.linearId == gameId }
-                    ?: throw FlowException("No game with id $gameId found.")
+                    ?: throw FlowException("0 or 2 games with $gameId found.")
             val notary = gameStateAndRef.state.notary
 
             progressTracker.currentStep = ResolvingCommits
@@ -110,19 +110,16 @@ object ForeClosureFlow {
                     .addInputState(gameRef)
                     .addCommand(GameContract.Commands.Close(0), ourIdentity.owningKey)
 
-            if (commitRefs.isNotEmpty()) {
-                commitRefs.forEach {
-                    builder.addCommand(Close(builder.inputStates().size), ourIdentity.owningKey)
-                    builder.addInputState(it)
-                }
+            commitRefs.forEach {
+                builder.addCommand(Close(builder.inputStates().size), ourIdentity.owningKey)
+                builder.addInputState(it)
             }
 
-            if (revealRefs.isNotEmpty()) {
-                revealRefs.forEach {
-                    builder.addCommand(Use(builder.inputStates().size), ourIdentity.owningKey)
-                    builder.addInputState(it)
-                }
+            revealRefs.forEach {
+                builder.addCommand(Use(builder.inputStates().size), ourIdentity.owningKey)
+                builder.addInputState(it)
             }
+
 
             progressTracker.currentStep = VerifyingTransaction
             builder.verify(serviceHub)
