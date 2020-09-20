@@ -53,3 +53,5 @@ data class GameState(
                 revealDeadline)
     }
 }
+
+fun StateAndRef<GameState>.getLockedWagersRef() = StateRef(ref.txhash, state.data.lockedWagersOutputIndex)

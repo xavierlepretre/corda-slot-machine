@@ -4,8 +4,11 @@ import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Close
 import com.cordacodeclub.contracts.CommitContract.Commands.Use
 import com.cordacodeclub.contracts.GameContract
+import com.cordacodeclub.contracts.LockableTokenContract
+import com.cordacodeclub.contracts.LockableTokenContract.Commands.Release
 import com.cordacodeclub.states.*
 import net.corda.core.contracts.StateAndRef
+import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.*
 import net.corda.core.node.services.queryBy
@@ -17,6 +20,7 @@ import net.corda.core.utilities.ProgressTracker
 /**
  * Flows to close an incomplete game.
  */
+@Suppress("unused")
 object ForeClosureFlow {
 
     @StartableByRPC
@@ -33,6 +37,7 @@ object ForeClosureFlow {
             object ResolvingGame : ProgressTracker.Step("Resolving game.")
             object ResolvingCommits : ProgressTracker.Step("Resolving commits.")
             object ResolvingReveals : ProgressTracker.Step("Resolving reveals.")
+            object ResolvingLockedTokens : ProgressTracker.Step("Resolving locked tokens.")
             object PassingOnToInitiator : ProgressTracker.Step("Passing on to initiator.") {
                 override fun childProgressTracker() = Initiator.tracker()
             }
@@ -41,6 +46,7 @@ object ForeClosureFlow {
                     ResolvingGame,
                     ResolvingCommits,
                     ResolvingReveals,
+                    ResolvingLockedTokens,
                     PassingOnToInitiator)
         }
 
@@ -71,10 +77,15 @@ object ForeClosureFlow {
                     .mapNotNull { it as? StateAndRef<RevealedState> }
                     .filter { it.state.data.game.pointer == gameStateAndRef.ref }
 
+            progressTracker.currentStep = ResolvingLockedTokens
+            val lockedTokensRef = serviceHub
+                    .toStateAndRef<LockableTokenState>(gameStateAndRef.getLockedWagersRef())
+
             progressTracker.currentStep = PassingOnToInitiator
             return subFlow(Initiator(revealRefs = associatedRevealStates,
                     commitRefs = associatedCommitStates,
                     gameRef = gameStateAndRef,
+                    lockedTokensRef = lockedTokensRef,
                     progressTracker = PassingOnToInitiator.childProgressTracker()))
         }
     }
@@ -85,12 +96,15 @@ object ForeClosureFlow {
             val revealRefs: List<StateAndRef<RevealedState>>,
             val commitRefs: List<StateAndRef<CommittedState>>,
             val gameRef: StateAndRef<GameState>,
+            val lockedTokensRef: StateAndRef<LockableTokenState>,
             override val progressTracker: ProgressTracker
     ) : FlowLogic<SignedTransaction>() {
 
         constructor(revealRefs: List<StateAndRef<RevealedState>>,
                     commitRefs: List<StateAndRef<CommittedState>>,
-                    gameRef: StateAndRef<GameState>) : this(revealRefs, commitRefs, gameRef, tracker())
+                    gameRef: StateAndRef<GameState>,
+                    lockedTokensRef: StateAndRef<LockableTokenState>)
+                : this(revealRefs, commitRefs, gameRef, lockedTokensRef, tracker())
 
         init {
             require(commitRefs.isNotEmpty()) { "There must be unrevealed commit states" }
@@ -114,7 +128,9 @@ object ForeClosureFlow {
         @Suspendable
         override fun call(): SignedTransaction {
             progressTracker.currentStep = GeneratingTransaction
+            val game = gameRef.state.data
             val builder = TransactionBuilder(gameRef.state.notary)
+                    .setTimeWindow(TimeWindow.fromOnly(game.revealDeadline.plusSeconds(1)))
                     .addInputState(gameRef)
                     .addCommand(GameContract.Commands.Close(0), ourIdentity.owningKey)
 
@@ -128,12 +144,26 @@ object ForeClosureFlow {
                 builder.addInputState(it)
             }
 
+            // Reversing plain and simple. TODO Add penalty.
+            builder.addCommand(Release(listOf(builder.inputStates().size), listOf(0, 1)),
+                    ourIdentity.owningKey)
+                    .addInputState(lockedTokensRef)
+                    .addOutputState(
+                            LockableTokenState(game.player.committer.holder, game.tokenIssuer, game.player.issuedAmount.amount),
+                            LockableTokenContract.id)
+                    .addOutputState(
+                            LockableTokenState(game.casino.committer.holder, game.tokenIssuer, game.casino.issuedAmount.amount),
+                            LockableTokenContract.id)
 
             progressTracker.currentStep = VerifyingTransaction
             builder.verify(serviceHub)
 
-            val otherParties = gameRef.state.data.participants
-                    .filter { it.owningKey != ourIdentity.owningKey }.distinct()
+            val otherParties = (commitRefs + revealRefs + gameRef + lockedTokensRef)
+                    .flatMap { it.state.data.participants }
+                    .map { serviceHub.identityService.wellKnownPartyFromAnonymous(it)
+                            ?: throw FlowException("A party cannot be resolved")}
+                    .filter { it != ourIdentity }
+                    .distinct()
             val otherSessions = otherParties.map { initiateFlow(it) }
 
             progressTracker.currentStep = SigningTransaction
