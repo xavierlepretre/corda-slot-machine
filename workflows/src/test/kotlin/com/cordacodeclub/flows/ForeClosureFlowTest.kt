@@ -18,6 +18,7 @@ import net.corda.testing.node.TestCordapp
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import kotlin.test.assertEquals
 
 class ForeClosureFlowTest {
     private lateinit var network: MockNetwork
@@ -107,6 +108,12 @@ class ForeClosureFlowTest {
                 .get()
                 .tx
                 .outRefsOfType()
+    }
+
+    @Test
+    fun `scheduled task has correct flow name`() {
+        assertEquals(ForeClosureFlow.SimpleInitiator::class.java.name,
+            GameState.foreClosureFlowName)
     }
 
     @Test

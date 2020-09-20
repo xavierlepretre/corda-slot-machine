@@ -11,11 +11,10 @@ import com.cordacodeclub.states.getGamePointer
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.*
-import net.corda.core.identity.Party
 import net.corda.core.node.services.queryBy
+import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
-import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.utilities.ProgressTracker
 
 /**
@@ -29,6 +28,7 @@ object ForeClosureFlow {
             override val progressTracker: ProgressTracker
     ) : FlowLogic<SignedTransaction>() {
 
+        @Suppress("unused")
         constructor(gameId: UniqueIdentifier) : this(gameId, tracker())
 
         companion object {
@@ -53,7 +53,6 @@ object ForeClosureFlow {
                     .queryBy(GameState::class.java, QueryCriteria.LinearStateQueryCriteria().withUuid(listOf(gameId.id)))
                     .states.singleOrNull { it.state.data.linearId == gameId }
                     ?: throw FlowException("0 or 2 games with $gameId found.")
-            val notary = gameStateAndRef.state.notary
 
             progressTracker.currentStep = ResolvingCommits
             val associatedRevealStates = serviceHub.vaultService.queryBy<RevealedState>().states
@@ -67,7 +66,6 @@ object ForeClosureFlow {
             return subFlow(Initiator(revealRefs = associatedRevealStates,
                     commitRefs = associatedCommitStates,
                     gameRef = gameStateAndRef,
-                    notary = notary,
                     progressTracker = PassingOnToInitiator.childProgressTracker()))
         }
     }
@@ -78,14 +76,16 @@ object ForeClosureFlow {
             val revealRefs: List<StateAndRef<RevealedState>>,
             val commitRefs: List<StateAndRef<CommittedState>>,
             val gameRef: StateAndRef<GameState>,
-            val notary: Party?,
             override val progressTracker: ProgressTracker
     ) : FlowLogic<SignedTransaction>() {
 
         constructor(revealRefs: List<StateAndRef<RevealedState>>,
                     commitRefs: List<StateAndRef<CommittedState>>,
-                    gameRef: StateAndRef<GameState>,
-                    notary: Party?) : this(revealRefs, commitRefs, gameRef, notary, tracker())
+                    gameRef: StateAndRef<GameState>) : this(revealRefs, commitRefs, gameRef, tracker())
+
+        init {
+            require(commitRefs.isNotEmpty()) { "There must be unrevealed commit states" }
+        }
 
         companion object {
             object GeneratingTransaction : ProgressTracker.Step("Generating transaction.")
@@ -105,8 +105,7 @@ object ForeClosureFlow {
         @Suspendable
         override fun call(): SignedTransaction {
             progressTracker.currentStep = GeneratingTransaction
-            val notary = notary ?: gameRef.state.notary
-            val builder = TransactionBuilder(notary)
+            val builder = TransactionBuilder(gameRef.state.notary)
                     .addInputState(gameRef)
                     .addCommand(GameContract.Commands.Close(0), ourIdentity.owningKey)
 

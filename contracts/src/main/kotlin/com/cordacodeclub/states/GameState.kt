@@ -2,9 +2,8 @@ package com.cordacodeclub.states
 
 import com.cordacodeclub.contracts.CommitContract
 import com.cordacodeclub.contracts.GameContract
-import net.corda.core.contracts.BelongsToContract
-import net.corda.core.contracts.LinearState
-import net.corda.core.contracts.UniqueIdentifier
+import net.corda.core.contracts.*
+import net.corda.core.flows.FlowLogicRefFactory
 import net.corda.core.identity.AbstractParty
 import java.time.Instant
 
@@ -22,10 +21,11 @@ data class GameState(
         val revealDeadline: Instant,
         val lockedWagersOutputIndex: Int,
         override val linearId: UniqueIdentifier,
-        override val participants: List<AbstractParty>) : LinearState {
+        override val participants: List<AbstractParty>) : LinearState, SchedulableState {
 
     companion object {
         const val maxPayoutRatio = 200L - 1L
+        const val foreClosureFlowName = "com.cordacodeclub.flows.ForeClosureFlow\$SimpleInitiator"
     }
 
     init {
@@ -44,4 +44,10 @@ data class GameState(
 
     val bettedAmount
         get() = casino.issuedAmount.amount.plus(player.issuedAmount.amount)
+
+    override fun nextScheduledActivity(thisStateRef: StateRef, flowLogicRefFactory: FlowLogicRefFactory): ScheduledActivity? {
+        return ScheduledActivity(
+                flowLogicRefFactory.create(foreClosureFlowName, linearId),
+                revealDeadline)
+    }
 }
