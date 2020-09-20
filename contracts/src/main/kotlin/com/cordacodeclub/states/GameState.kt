@@ -45,6 +45,8 @@ data class GameState(
     val bettedAmount
         get() = casino.issuedAmount.amount.plus(player.issuedAmount.amount)
 
+    val commitIds = listOf(casino.committer.linearId, player.committer.linearId)
+
     override fun nextScheduledActivity(thisStateRef: StateRef, flowLogicRefFactory: FlowLogicRefFactory): ScheduledActivity? {
         return ScheduledActivity(
                 flowLogicRefFactory.create(foreClosureFlowName, linearId),

@@ -4,10 +4,7 @@ import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.CommitContract.Commands.Close
 import com.cordacodeclub.contracts.CommitContract.Commands.Use
 import com.cordacodeclub.contracts.GameContract
-import com.cordacodeclub.states.CommittedState
-import com.cordacodeclub.states.GameState
-import com.cordacodeclub.states.RevealedState
-import com.cordacodeclub.states.getGamePointer
+import com.cordacodeclub.states.*
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.*
@@ -23,6 +20,7 @@ import net.corda.core.utilities.ProgressTracker
 object ForeClosureFlow {
 
     @StartableByRPC
+    @SchedulableFlow
     class SimpleInitiator(
             private val gameId: UniqueIdentifier,
             override val progressTracker: ProgressTracker
@@ -50,17 +48,23 @@ object ForeClosureFlow {
         override fun call(): SignedTransaction {
             progressTracker.currentStep = ResolvingGame
             val gameStateAndRef = serviceHub.vaultService
-                    .queryBy(GameState::class.java, QueryCriteria.LinearStateQueryCriteria().withUuid(listOf(gameId.id)))
+                    .queryBy<GameState>(QueryCriteria.LinearStateQueryCriteria().withUuid(listOf(gameId.id)))
                     .states.singleOrNull { it.state.data.linearId == gameId }
                     ?: throw FlowException("0 or 2 games with $gameId found.")
 
             progressTracker.currentStep = ResolvingCommits
-            val associatedRevealStates = serviceHub.vaultService.queryBy<RevealedState>().states
-                    .filter { it.state.data.game.pointer == gameStateAndRef.ref }
+            val eitherCommitStates = serviceHub.vaultService.queryBy<CommitState>(
+                    QueryCriteria.LinearStateQueryCriteria()
+                            .withUuid(gameStateAndRef.state.data.commitIds.map { it.id }))
+                    .states
+            val associatedCommitStates = eitherCommitStates
+                    .filterIsInstance<StateAndRef<CommittedState>>()
+                    .filter { it.getGamePointer().pointer == gameStateAndRef.ref }
 
             progressTracker.currentStep = ResolvingReveals
-            val associatedCommitStates = serviceHub.vaultService.queryBy<CommittedState>().states
-                    .filter { it.getGamePointer().pointer == gameStateAndRef.ref }
+            val associatedRevealStates = eitherCommitStates
+                    .filterIsInstance<StateAndRef<RevealedState>>()
+                    .filter { it.state.data.game.pointer == gameStateAndRef.ref }
 
             progressTracker.currentStep = PassingOnToInitiator
             return subFlow(Initiator(revealRefs = associatedRevealStates,
