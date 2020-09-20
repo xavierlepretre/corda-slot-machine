@@ -57,13 +57,18 @@ object ForeClosureFlow {
                     QueryCriteria.LinearStateQueryCriteria()
                             .withUuid(gameStateAndRef.state.data.commitIds.map { it.id }))
                     .states
+
+            @Suppress("UNCHECKED_CAST")
             val associatedCommitStates = eitherCommitStates
-                    .filterIsInstance<StateAndRef<CommittedState>>()
+                    .filter { it.state.data is CommittedState }
+                    .mapNotNull { it as? StateAndRef<CommittedState> }
                     .filter { it.getGamePointer().pointer == gameStateAndRef.ref }
 
             progressTracker.currentStep = ResolvingReveals
+            @Suppress("UNCHECKED_CAST")
             val associatedRevealStates = eitherCommitStates
-                    .filterIsInstance<StateAndRef<RevealedState>>()
+                    .filter { it.state.data is RevealedState }
+                    .mapNotNull { it as? StateAndRef<RevealedState> }
                     .filter { it.state.data.game.pointer == gameStateAndRef.ref }
 
             progressTracker.currentStep = PassingOnToInitiator
