@@ -6,14 +6,17 @@ import com.r3.corda.lib.accounts.workflows.flows.CreateAccount
 import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingInitiator
 import net.corda.core.contracts.StateAndRef
+import net.corda.core.flows.NotaryException
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.utilities.getOrThrow
 import net.corda.testing.common.internal.testNetworkParameters
 import net.corda.testing.node.*
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.jupiter.api.assertThrows
 import java.time.Duration
 import kotlin.test.assertEquals
 
@@ -115,7 +118,7 @@ class ForeClosureFlowTest {
                 GameState.foreClosureFlowName)
     }
 
-    @Test(timeout = 600)
+    @Test(timeout = 300_000L)
     fun `casino can run foreclosure flow when the player did not reveal`() {
         casinoNode.registerInitiatedFlow(
                 BrokenGameFlows.PlayerDoesNotReveal.Initiator::class.java,
@@ -130,7 +133,7 @@ class ForeClosureFlowTest {
         // Advance time beyond the reveal deadline.
         val onwards = GameParameters.commitDuration + GameParameters.revealDuration +
                 Duration.ofMinutes(1)
-        listOf(notaryNode, playerNode, casinoNode)
+        listOf(notaryNode, casinoNode) // The player does not get past the deadline
                 .forEach { (it.services.clock as TestClock).advanceBy(onwards) }
 
         // The foreclosure flow will start itself thanks to schedulable state.
@@ -145,4 +148,111 @@ class ForeClosureFlowTest {
                 .get()
         assertEquals(GameState.maxPayoutRatio * 3L, casinoBalance)
     }
+
+    @Test(timeout = 300_000L)
+    fun `player can run foreclosure flow when the player did not reveal`() {
+        casinoNode.registerInitiatedFlow(
+                BrokenGameFlows.PlayerDoesNotReveal.Initiator::class.java,
+                GameFlows.Responder::class.java)
+        issueToken(issuerNode, casino1, issuer, GameState.maxPayoutRatio * 3L)
+        issueToken(issuerNode, player1, issuer, 3L)
+        playerNode.startFlow(
+                BrokenGameFlows.PlayerDoesNotReveal.Initiator(player1, 3L, issuer, casino1))
+                .also { network.waitQuiescent() }
+                .get()
+
+        // Advance time beyond the reveal deadline.
+        val onwards = GameParameters.commitDuration + GameParameters.revealDuration +
+                Duration.ofMinutes(1)
+        listOf(notaryNode, playerNode) // The casino does not get past the deadline
+                .forEach { (it.services.clock as TestClock).advanceBy(onwards) }
+
+        // The foreclosure flow will start itself thanks to schedulable state.
+        network.waitQuiescent()
+
+        val playerBalance = playerNode.startFlow(LockableTokenFlows.Balance.Local(player1, issuer))
+                .also { network.waitQuiescent() }
+                .get()
+        assertEquals(3L, playerBalance)
+        val casinoBalance = casinoNode.startFlow(LockableTokenFlows.Balance.Local(casino1, issuer))
+                .also { network.waitQuiescent() }
+                .get()
+        assertEquals(GameState.maxPayoutRatio * 3L, casinoBalance)
+    }
+
+    @Test(timeout = 300_000L)
+    fun `player can run foreclosure flow when the casino did not reveal`() {
+        casinoNode.registerInitiatedFlow(
+                BrokenGameFlows.CasinoDoesNotReveal.Initiator::class.java,
+                BrokenGameFlows.CasinoDoesNotReveal.Responder::class.java)
+        issueToken(issuerNode, casino1, issuer, GameState.maxPayoutRatio * 3L)
+        issueToken(issuerNode, player1, issuer, 3L)
+        playerNode.startFlow(
+                BrokenGameFlows.CasinoDoesNotReveal.Initiator(player1, 3L, issuer, casino1))
+                .also { network.waitQuiescent() }
+                .get()
+
+        // Advance time beyond the reveal deadline.
+        val onwards = GameParameters.commitDuration + GameParameters.revealDuration +
+                Duration.ofMinutes(1)
+        listOf(notaryNode, playerNode) // casino does not get past deadline
+                .forEach { (it.services.clock as TestClock).advanceBy(onwards) }
+
+        // The foreclosure flow will start itself thanks to schedulable state.
+        network.waitQuiescent()
+
+        val playerBalance = playerNode.startFlow(LockableTokenFlows.Balance.Local(player1, issuer))
+                .also { network.waitQuiescent() }
+                .get()
+        assertEquals(3L, playerBalance)
+        val casinoBalance = casinoNode.startFlow(LockableTokenFlows.Balance.Local(casino1, issuer))
+                .also { network.waitQuiescent() }
+                .get()
+        assertEquals(GameState.maxPayoutRatio * 3L, casinoBalance)
+    }
+
+    @Test(timeout = 300_000L)
+    fun `casino cannot run foreclosure flow when the casino did not reveal`() {
+        casinoNode.registerInitiatedFlow(
+                BrokenGameFlows.CasinoDoesNotReveal.Initiator::class.java,
+                BrokenGameFlows.CasinoDoesNotReveal.Responder::class.java)
+        issueToken(issuerNode, casino1, issuer, GameState.maxPayoutRatio * 3L)
+        issueToken(issuerNode, player1, issuer, 3L)
+        val game = playerNode.startFlow(
+                BrokenGameFlows.CasinoDoesNotReveal.Initiator(player1, 3L, issuer, casino1))
+                .also { network.waitQuiescent() }
+                .get()
+                .commitTx
+                .tx
+                .outputsOfType<GameState>()
+                .single()
+
+        // Advance time beyond the reveal deadline.
+        val onwards = GameParameters.commitDuration + GameParameters.revealDuration +
+                Duration.ofMinutes(1)
+        listOf(notaryNode, casinoNode) // Player does not get past the deadline.
+                .forEach { (it.services.clock as TestClock).advanceBy(onwards) }
+
+        // The foreclosure flow will start itself thanks to schedulable state.
+        network.waitQuiescent()
+
+        // And confirm it fails
+        assertThrows<NotaryException> {
+            casinoNode.startFlow(
+                    ForeClosureFlow.SimpleInitiator(game.linearId))
+                    .also { network.waitQuiescent() }
+                    .getOrThrow()
+        }
+
+        // Tokens are still locked
+        val playerBalance = playerNode.startFlow(LockableTokenFlows.Balance.Local(player1, issuer))
+                .also { network.waitQuiescent() }
+                .get()
+        assertEquals(0L, playerBalance)
+        val casinoBalance = casinoNode.startFlow(LockableTokenFlows.Balance.Local(casino1, issuer))
+                .also { network.waitQuiescent() }
+                .get()
+        assertEquals(0L, casinoBalance)
+    }
+
 }
