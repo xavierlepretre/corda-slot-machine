@@ -33,9 +33,9 @@ class ForeClosureFlowTest {
 
     @Before
     fun setup() {
-        network = MockNetwork(MockNetworkParameters(
-                networkParameters = testNetworkParameters(listOf(), 4),
-                cordappsForAllNodes = listOf(
+        network = MockNetwork(MockNetworkParameters()
+                .withNetworkParameters(testNetworkParameters(listOf(), 4))
+                .withCordappsForAllNodes(listOf(
                         TestCordapp.findCordapp("com.r3.corda.lib.accounts.contracts"),
                         TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
                         TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
@@ -69,12 +69,12 @@ class ForeClosureFlowTest {
                 .map { it.get().state.data }
                 .map { casinoNode.services.createKeyForAccount(it) }
                 .onEach {
-                    casinoNode.startFlow(SyncKeyMappingInitiator(issuerNodeParty, listOf(it)))
-                            .also { network.waitQuiescent() }
-                            .get()
-                    casinoNode.startFlow(SyncKeyMappingInitiator(playerNodeParty, listOf(it)))
-                            .also { network.waitQuiescent() }
-                            .get()
+                    listOf(issuerNodeParty, playerNodeParty)
+                            .forEach { recipient ->
+                                casinoNode.startFlow(SyncKeyMappingInitiator(recipient, listOf(it)))
+                                        .also { network.waitQuiescent() }
+                                        .get()
+                            }
                 }
         this.casino1 = casino1
         this.casino2 = casino2
@@ -115,8 +115,8 @@ class ForeClosureFlowTest {
                 GameState.foreClosureFlowName)
     }
 
-    @Test
-    fun `can run foreclosure flow when the player did not reveal`() {
+    @Test(timeout = 600)
+    fun `casino can run foreclosure flow when the player did not reveal`() {
         casinoNode.registerInitiatedFlow(
                 BrokenGameFlows.PlayerDoesNotReveal.Initiator::class.java,
                 GameFlows.Responder::class.java)

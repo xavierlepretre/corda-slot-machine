@@ -82,10 +82,10 @@ object ForeClosureFlow {
                     .toStateAndRef<LockableTokenState>(gameStateAndRef.getLockedWagersRef())
 
             progressTracker.currentStep = PassingOnToInitiator
-            return subFlow(Initiator(revealRefs = associatedRevealStates,
-                    commitRefs = associatedCommitStates,
-                    gameRef = gameStateAndRef,
+            return subFlow(Initiator(gameRef = gameStateAndRef,
                     lockedTokensRef = lockedTokensRef,
+                    commitRefs = associatedCommitStates,
+                    revealRefs = associatedRevealStates,
                     progressTracker = PassingOnToInitiator.childProgressTracker()))
         }
     }
@@ -93,18 +93,18 @@ object ForeClosureFlow {
     @InitiatingFlow
     @StartableByRPC
     class Initiator(
-            val revealRefs: List<StateAndRef<RevealedState>>,
-            val commitRefs: List<StateAndRef<CommittedState>>,
             val gameRef: StateAndRef<GameState>,
             val lockedTokensRef: StateAndRef<LockableTokenState>,
+            val commitRefs: List<StateAndRef<CommittedState>>,
+            val revealRefs: List<StateAndRef<RevealedState>>,
             override val progressTracker: ProgressTracker
     ) : FlowLogic<SignedTransaction>() {
 
-        constructor(revealRefs: List<StateAndRef<RevealedState>>,
+        constructor(gameRef: StateAndRef<GameState>,
+                    lockedTokensRef: StateAndRef<LockableTokenState>,
                     commitRefs: List<StateAndRef<CommittedState>>,
-                    gameRef: StateAndRef<GameState>,
-                    lockedTokensRef: StateAndRef<LockableTokenState>)
-                : this(revealRefs, commitRefs, gameRef, lockedTokensRef, tracker())
+                    revealRefs: List<StateAndRef<RevealedState>>)
+                : this(gameRef, lockedTokensRef, commitRefs, revealRefs, tracker())
 
         init {
             require(commitRefs.isNotEmpty()) { "There must be unrevealed commit states" }
@@ -170,12 +170,12 @@ object ForeClosureFlow {
             val signed = serviceHub.signInitialTransaction(builder, ourIdentity.owningKey)
 
             progressTracker.currentStep = FinalisingTransaction
-            return subFlow(FinalityFlow(signed, otherSessions))
+            return subFlow(FinalityFlow(signed, otherSessions, FinalisingTransaction.childProgressTracker()))
         }
     }
 
     /**
-     * In-lined flow to potentially receive some commits, reveals and a game.
+     * In-lined flow to receive a foreclosed game.
      * Its initiator is [Initiator].
      */
     @InitiatedBy(Initiator::class)
