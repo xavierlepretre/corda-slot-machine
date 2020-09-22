@@ -1,10 +1,7 @@
 package com.cordacodeclub.webserver
 
-import com.cordacodeclub.flows.AccountNotFoundException
-import com.cordacodeclub.flows.GameFlows
-import com.cordacodeclub.flows.LockableTokenFlows
+import com.cordacodeclub.flows.*
 import com.cordacodeclub.flows.LockableTokenFlows.Fetch.NotEnoughTokensException
-import com.cordacodeclub.flows.UserAccountFlows
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.messaging.startFlow
 import net.corda.core.utilities.getOrThrow
@@ -51,6 +48,9 @@ class Controller(rpc: NodeRPCConnection) {
         } catch (error: AccountNotFoundException) {
             ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Account not found, you need to reset")
+        } catch (error: AccountAlreadyExistsException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Account $name already exists")
         } catch (error: Exception) {
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed $error")
