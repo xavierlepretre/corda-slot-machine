@@ -21,6 +21,7 @@ import org.junit.Test
 
 class GameFlowsTest {
     private lateinit var network: MockNetwork
+    private lateinit var notaryParty: Party
     private lateinit var issuerNode: StartedMockNode
     private lateinit var issuerNodeParty: Party
     private lateinit var issuer: AbstractParty
@@ -42,6 +43,7 @@ class GameFlowsTest {
                 TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
                 TestCordapp.findCordapp("com.cordacodeclub.contracts"),
                 TestCordapp.findCordapp("com.cordacodeclub.flows"))))
+        notaryParty = network.defaultNotaryIdentity
         issuerNode = network.createPartyNode()
         issuerNodeParty = issuerNode.info.legalIdentities.first()
         casinoNode = network.createPartyNode(CordaX500Name("Casino", "London", "GB"))
@@ -113,7 +115,7 @@ class GameFlowsTest {
     fun `can launch the game along the happy path without change`() {
         issueToken(issuerNode, casino1, issuer, GameState.maxPayoutRatio * 3L)
         issueToken(issuerNode, player1, issuer, 3L)
-        playerNode.startFlow(GameFlows.Initiator(player1, 3L, issuer, casino1))
+        playerNode.startFlow(GameFlows.Initiator(notaryParty, player1, 3L, issuer, casino1))
                 .also { network.runNetwork() }
                 .get()
     }
@@ -122,7 +124,7 @@ class GameFlowsTest {
     fun `can launch the game along the happy path with change`() {
         issueToken(issuerNode, casino1, issuer, GameState.maxPayoutRatio * 4L + 2L)
         issueToken(issuerNode, player1, issuer, 9L)
-        playerNode.startFlow(GameFlows.Initiator(player1, 4L, issuer, casino1))
+        playerNode.startFlow(GameFlows.Initiator(notaryParty, player1, 4L, issuer, casino1))
                 .also { network.runNetwork() }
                 .get()
     }

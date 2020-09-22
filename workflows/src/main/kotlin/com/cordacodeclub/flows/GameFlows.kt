@@ -7,6 +7,7 @@ import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlowHandler
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.*
 import net.corda.core.identity.AbstractParty
+import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
@@ -64,17 +65,19 @@ object GameFlows {
     }
 
     @StartableByRPC
-    class SimpleInitiator(private val playerAccountName: String,
+    class SimpleInitiator(private val notary: String,
+                          private val playerAccountName: String,
                           private val playerWager: Long,
                           private val issuer: AbstractParty,
                           private val casino: AbstractParty,
                           override val progressTracker: ProgressTracker) : FlowLogic<GameResult>() {
 
-        constructor(playerAccountName: String,
+        constructor(notary: String,
+                    playerAccountName: String,
                     playerWager: Long,
                     issuer: AbstractParty,
                     casino: AbstractParty)
-                : this(playerAccountName, playerWager, issuer, casino, tracker())
+                : this(notary, playerAccountName, playerWager, issuer, casino, tracker())
 
         companion object {
             object ResolvingPlayer : ProgressTracker.Step("Resolving player.")
@@ -98,7 +101,10 @@ object GameFlows {
             val player = getParty(playerAccountName)
 
             progressTracker.currentStep = PassingOnToInitiator
-            val playerPayout = subFlow(Initiator(player = player,
+            val playerPayout = subFlow(Initiator(
+                    notary = serviceHub.networkMapCache.getNotary(CordaX500Name.parse(notary))
+                            ?: throw FlowException("$notary not found"),
+                    player = player,
                     playerWager = playerWager,
                     issuer = issuer,
                     casino = casino,
@@ -118,14 +124,16 @@ object GameFlows {
      */
     @InitiatingFlow
     @StartableByRPC
-    class Initiator(private val player: AbstractParty,
+    class Initiator(private val notary: Party,
+                    private val player: AbstractParty,
                     private val playerWager: Long,
                     private val issuer: AbstractParty,
                     private val casino: AbstractParty,
                     override val progressTracker: ProgressTracker) : FlowLogic<GameTransactions>() {
 
-        constructor(player: AbstractParty, playerWager: Long, issuer: AbstractParty, casino: AbstractParty)
-                : this(player, playerWager, issuer, casino, tracker())
+        constructor(notary: Party, player: AbstractParty, playerWager: Long,
+                    issuer: AbstractParty, casino: AbstractParty)
+                : this(notary, player, playerWager, issuer, casino, tracker())
 
         companion object {
             object CreatingPlayerImage : ProgressTracker.Step("Creating player image.")
@@ -191,7 +199,6 @@ object GameFlows {
 
             // Inform casino of new game
             progressTracker.currentStep = SendingGameSetup
-            val notary = serviceHub.networkMapCache.notaryIdentities[0]
             val setup = GameSetup(notary = notary,
                     player = player,
                     playerWager = playerWager,

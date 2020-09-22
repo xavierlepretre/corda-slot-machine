@@ -22,7 +22,8 @@ class Controller(rpc: NodeRPCConnection) {
         private val logger = LoggerFactory.getLogger(RestController::class.java)
 
         // TODO change
-        private val TODO_notary_x500 = CordaX500Name.parse("O=Notary, L=London, C=GB")
+        private val TODO_notary_name = "O=Notary, L=London, C=GB"
+        private val TODO_notary_x500 = CordaX500Name.parse(TODO_notary_name)
         private val TODO_casino_x500 = CordaX500Name.parse("O=Casino, L=New York, C=US")
     }
 
@@ -77,7 +78,8 @@ class Controller(rpc: NodeRPCConnection) {
         val name = request.getParameter("name")
         val wager = request.getParameter("wager").toLong()
         return try {
-            val result = proxy.startFlow(GameFlows::SimpleInitiator, name, wager, casino, casino)
+            val result = proxy.startFlow(GameFlows::SimpleInitiator, TODO_notary_name,
+                    name, wager, casino, casino)
                     .returnValue.getOrThrow()
             val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, casino)
                     .returnValue.getOrThrow()
@@ -114,7 +116,8 @@ class Controller(rpc: NodeRPCConnection) {
         val name = request.getParameter("name")
         val wager = request.getParameter("wager").toLong()
         return try {
-            val result = proxy.startFlow(GameFlows::SimpleInitiator, name, wager, casino, casino)
+            val result = proxy.startFlow(GameFlows::SimpleInitiator, TODO_notary_name, name,
+                    wager, casino, casino)
                     .returnValue.getOrThrow()
             // returns a single simple element from the GameResult
             ResponseEntity.ok("Created ${result.payout_credits}")
