@@ -9,7 +9,6 @@ import net.corda.core.contracts.StateAndRef
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
-import net.corda.core.node.NetworkParameters
 import net.corda.testing.common.internal.testNetworkParameters
 import net.corda.testing.node.MockNetwork
 import net.corda.testing.node.MockNetworkParameters
@@ -35,14 +34,14 @@ class GameFlowsTest {
 
     @Before
     fun setup() {
-        network = MockNetwork(MockNetworkParameters(
-                networkParameters = testNetworkParameters(listOf(), 4),
-                cordappsForAllNodes = listOf(
-                TestCordapp.findCordapp("com.r3.corda.lib.accounts.contracts"),
-                TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
-                TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
-                TestCordapp.findCordapp("com.cordacodeclub.contracts"),
-                TestCordapp.findCordapp("com.cordacodeclub.flows"))))
+        network = MockNetwork(MockNetworkParameters()
+                .withNetworkParameters(testNetworkParameters(listOf(), 4))
+                .withCordappsForAllNodes(listOf(
+                        TestCordapp.findCordapp("com.r3.corda.lib.accounts.contracts"),
+                        TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
+                        TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
+                        TestCordapp.findCordapp("com.cordacodeclub.contracts"),
+                        TestCordapp.findCordapp("com.cordacodeclub.flows"))))
         notaryParty = network.defaultNotaryIdentity
         issuerNode = network.createPartyNode()
         issuerNodeParty = issuerNode.info.legalIdentities.first()
@@ -66,12 +65,12 @@ class GameFlowsTest {
                 .map { it.get().state.data }
                 .map { casinoNode.services.createKeyForAccount(it) }
                 .onEach {
-                    casinoNode.startFlow(SyncKeyMappingInitiator(issuerNodeParty, listOf(it)))
-                            .also { network.runNetwork() }
-                            .get()
-                    casinoNode.startFlow(SyncKeyMappingInitiator(playerNodeParty, listOf(it)))
-                            .also { network.runNetwork() }
-                            .get()
+                    listOf(issuerNodeParty, playerNodeParty)
+                            .forEach { recipient ->
+                                casinoNode.startFlow(SyncKeyMappingInitiator(recipient, listOf(it)))
+                                        .also { network.runNetwork() }
+                                        .get()
+                            }
                 }
         this.casino1 = casino1
         this.casino2 = casino2
