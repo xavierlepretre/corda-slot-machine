@@ -3,8 +3,8 @@ package com.cordacodeclub.contracts
 import com.cordacodeclub.states.*
 import net.corda.core.contracts.CommandData
 import net.corda.core.contracts.Contract
-import net.corda.core.contracts.LinearState
 import net.corda.core.contracts.Requirements.using
+import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.AbstractParty
 import net.corda.core.transactions.LedgerTransaction
@@ -20,9 +20,12 @@ class GameContract : Contract {
         // Collect linear ids indices. Is it too restrictive as it may affect states that it does not care about.
         val inputIds = tx.inputs
                 .mapIndexedNotNull { index, state ->
-                    (state.state.data as? LinearState)?.let { index to it }
+                    (state.state.data as? CommitState)?.let {
+                        @Suppress("UNCHECKED_CAST")
+                        index to (state as StateAndRef<CommitState>)
+                    }
                 }
-                .groupBy { (_, state) -> state.linearId }
+                .groupBy { (_, state) -> state.state.data.linearId }
                 .mapValues {
                     if (it.value.size != 1)
                         throw IllegalArgumentException("There is more than 1 input state with a given id")
@@ -30,7 +33,7 @@ class GameContract : Contract {
                 }
         val outputIds = tx.outputStates
                 .mapIndexedNotNull { index, state ->
-                    (state as? LinearState)?.let { index to it }
+                    (state as? CommitState)?.let { index to it }
                 }
                 .groupBy { (_, state) -> state.linearId }
                 .mapValues {
@@ -43,13 +46,14 @@ class GameContract : Contract {
             when (command.value) {
                 is Commands.Create -> verifyCreate(tx, command.value as Commands.Create, command.signers, outputIds)
                 is Commands.Resolve -> verifyResolve(tx, command.value as Commands.Resolve, inputIds)
+                is Commands.Close -> verifyClose(tx, command.value as Commands.Close, inputIds)
             }
             command.value
         }
         "The GameContract must find at least 1 command" using commands.isNotEmpty()
-        val coveredInputs = commands.filterIsInstance<Commands.Resolve>()
+        val coveredInputs = commands.filterIsInstance<HasInput>()
                 .map { it.inputIndex }
-        val coveredOutputs = commands.filterIsInstance<Commands.Create>()
+        val coveredOutputs = commands.filterIsInstance<HasOutput>()
                 .map { it.outputIndex }
         "All covered inputs must have no overlap" using (coveredInputs.distinct().size == coveredInputs.size)
         "All covered outputs must have no overlap" using (coveredOutputs.distinct().size == coveredOutputs.size)
@@ -70,23 +74,23 @@ class GameContract : Contract {
     }
 
     private fun verifyCreate(tx: LedgerTransaction, create: Commands.Create, signers: List<PublicKey>,
-                             outputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>) {
+                             outputIds: Map<UniqueIdentifier, Pair<Int, CommitState>>) {
         "The output must be a GameState" using (tx.outputStates[create.outputIndex] is GameState)
         val gameRef = tx.outRef<GameState>(create.outputIndex)
         val gameState = gameRef.state.data
         val associatedCommits = listOf(gameState.casino, gameState.player)
                 .map { outputIds[it.committer.linearId] }
+        "The commit deadline must be satisfied" using (tx.timeWindow
+                ?.untilTime
+                ?.let { gameState.commitDeadline <= it }
+                ?: false)
         "The commit ids must all be associated CommittedStates" using associatedCommits.all { pair ->
-            pair?.let { (commitIndex, linearState) ->
-                linearState is CommittedState
-                        && linearState.gameOutputIndex == create.outputIndex
+            pair?.let { (commitIndex, commitState) ->
+                commitState is CommittedState
+                        && commitState.gameOutputIndex == create.outputIndex
                         && tx.outputs[commitIndex].contract == CommitContract.id
             } ?: false
         }
-        "The commits must all have the same reveal deadline" using (associatedCommits
-                .mapNotNull { (it?.second as? CommittedState)?.revealDeadline }
-                .distinct()
-                .size == 1)
         "The game bettors must all have commits" using (associatedCommits
                 .mapNotNull { (it?.second as? CommittedState)?.creator }
                 .distinct()
@@ -108,22 +112,22 @@ class GameContract : Contract {
     }
 
     private fun verifyResolve(tx: LedgerTransaction, resolve: Commands.Resolve,
-                              inputIds: Map<UniqueIdentifier, Pair<Int, LinearState>>) {
+                              inputIds: Map<UniqueIdentifier, Pair<Int, StateAndRef<CommitState>>>) {
         val gameRef = tx.inputs[resolve.inputIndex]
         "The input must be a GameState" using (gameRef.state.data is GameState)
         val gameState = gameRef.state.data as GameState
         "The commit ids must all be associated RevealedStates" using listOf(gameState.casino, gameState.player)
                 .map { it.committer.linearId }
                 .all { revealId ->
-                    inputIds[revealId]?.let { (revealIndex, linearState) ->
-                        linearState is RevealedState
-                                && linearState.game.pointer == gameRef.ref
-                                && tx.inRef<RevealedState>(revealIndex).state.contract == CommitContract.id
+                    inputIds[revealId]?.let { (_, commitRef) ->
+                        commitRef.state.data.let {
+                            it is RevealedState && it.game.pointer == gameRef.ref
+                        } && commitRef.state.contract == CommitContract.id
                     } ?: false
                 }
         val (casinoImage, playerImage) = listOf(gameState.casino, gameState.player)
                 .map { it.committer.linearId }
-                .mapNotNull { inputIds[it]?.second as? RevealedState }
+                .mapNotNull { inputIds[it]?.second?.state?.data as? RevealedState }
                 .map { it.image }
                 .also { "There should be 2 images " using (it.size == 2) }
         val expectedPlayerPayout = Math.multiplyExact(
@@ -146,14 +150,71 @@ class GameContract : Contract {
                 (actualCasinoPayout == (gameState.bettedAmount.quantity - expectedPlayerPayout))
     }
 
+    private fun verifyClose(tx: LedgerTransaction, close: Commands.Close,
+                            inputIds: Map<UniqueIdentifier, Pair<Int, StateAndRef<CommitState>>>) {
+        val gameRef = tx.inputs[close.inputIndex]
+        "The input must be a GameState" using (gameRef.state.data is GameState)
+        val gameState = gameRef.state.data as GameState
+        val associatedCommits = listOf(gameState.casino, gameState.player)
+                .map { inputIds[it.committer.linearId] }
+        "There must be a time window from time" using (tx.timeWindow?.fromTime != null)
+        val fromTime = tx.timeWindow!!.fromTime
+        "The soft close earliest time must be satisfied" using (gameState.revealDeadline < fromTime)
+        "The commit ids must all be associated CommittedStates or RevealedStates" using associatedCommits.all { pair ->
+            pair?.let { (_, linearState) ->
+                linearState.state.data.let { it is CommittedState || it is RevealedState }
+                        && linearState.getGamePointer().pointer == gameRef.ref
+                        && linearState.state.contract == CommitContract.id
+            } ?: false
+        }
+        "There must be at least 1 committed state" using associatedCommits.any { pair ->
+            pair?.second?.state?.data is CommittedState
+        }
+        "The locked wagers must be in input" using tx.inputs
+                .map { it.ref }
+                .contains(
+                        @Suppress("UNCHECKED_CAST")
+                        (gameRef as StateAndRef<GameState>).getLockedWagersRef())
+        val actualReturnCalculator = { holder: AbstractParty ->
+            tx.outputStates
+                    .filterIsInstance<LockableTokenState>()
+                    .filter { it.holder == holder && it.issuer == gameState.tokenIssuer }
+                    .takeIf { it.isNotEmpty() }
+                    ?.reduce(LockableTokenState::plus)
+                    ?.amount
+                    ?.quantity
+                    ?: 0L
+        }
+        val actualCasinoReturn = actualReturnCalculator(gameState.casino.committer.holder)
+        val actualPlayerReturn = actualReturnCalculator(gameState.player.committer.holder)
+        "The player returned tokens should be correct" using
+                (actualPlayerReturn == gameState.player.issuedAmount.amount.quantity)
+        "The casino returned tokens should be correct" using
+                (actualCasinoReturn == gameState.casino.issuedAmount.amount.quantity)
+    }
+
+    interface HasInput {
+        val inputIndex: Int
+    }
+
+    interface HasOutput {
+        val outputIndex: Int
+    }
+
     sealed class Commands : CommandData {
-        data class Create(val outputIndex: Int) : Commands() {
+        data class Create(override val outputIndex: Int) : Commands(), HasOutput {
             init {
                 require(0 <= outputIndex) { "Index must be positive" }
             }
         }
 
-        data class Resolve(val inputIndex: Int) : Commands() {
+        data class Resolve(override val inputIndex: Int) : Commands(), HasInput {
+            init {
+                require(0 <= inputIndex) { "Index must be positive" }
+            }
+        }
+
+        data class Close(override val inputIndex: Int) : Commands(), HasInput {
             init {
                 require(0 <= inputIndex) { "Index must be positive" }
             }

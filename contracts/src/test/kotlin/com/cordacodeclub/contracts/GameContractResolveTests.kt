@@ -40,15 +40,16 @@ class GameContractResolveTests {
             casinoHash: SecureHash, playerHash: SecureHash) = transaction {
         val casinoId = UniqueIdentifier()
         val playerId = UniqueIdentifier()
-        val revealDeadline = Instant.now().plusSeconds(60)
+        val commitDeadline = Instant.now().plusSeconds(30)
+        val revealDeadline = commitDeadline.plusSeconds(30)
         input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(398L, LockableTokenType)))
         input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(3L, LockableTokenType)))
         output(CommitContract.id, CommittedState(casinoHash, casino,
-                revealDeadline, 2, casinoId))
+                2, casinoId))
         output(CommitContract.id, CommittedState(playerHash, player,
-                revealDeadline, 2, playerId))
+                2, playerId))
         output(GameContract.id, 3, GameState(casino commitsTo casinoId with (398L issuedBy issuer),
-                player commitsTo playerId with (2L issuedBy issuer), 3,
+                player commitsTo playerId with (2L issuedBy issuer), commitDeadline, revealDeadline, 3,
                 UniqueIdentifier(), listOf(casino, player)))
         output(LockableTokenContract.id, 2, LockableTokenState(issuer, Amount(400L, LockableTokenType),
                 listOf(casino, player)))
@@ -58,18 +59,21 @@ class GameContractResolveTests {
         command(listOf(casino.owningKey, player.owningKey), Create(2))
         command(listOf(casino.owningKey, player.owningKey),
                 LockableTokenContract.Commands.Lock(listOf(0, 1), listOf(3, 4)))
+        timeWindow(TimeWindow.untilOnly(commitDeadline))
         verifies()
     }
 
     private fun LedgerDSL<TestTransactionDSLInterpreter, TestLedgerDSLInterpreter>.reveal(
-            committedRef: StateAndRef<CommittedState>, image: CommitImage) = transaction {
+            committedRef: StateAndRef<CommittedState>, image: CommitImage,
+            gameRef: StateAndRef<GameState>) = transaction {
+        require(gameRef.ref == committedRef.getGamePointer().pointer) { "Wrong gameRef" }
         val committed = committedRef.state.data
         input(committedRef.ref)
         output(CommitContract.id, RevealedState(image, committed.creator, committedRef.getGamePointer(),
                 committed.linearId))
         command(committed.creator.owningKey, Reveal(0, 0))
-        reference(committedRef.getGamePointer().pointer)
-        timeWindow(TimeWindow.untilOnly(committed.revealDeadline))
+        reference(gameRef.ref)
+        timeWindow(TimeWindow.untilOnly(gameRef.state.data.revealDeadline))
         verifies()
     }
 
@@ -82,8 +86,8 @@ class GameContractResolveTests {
             val (casinoRef, playerRef) = issueTx.outRefsOfType<CommittedState>()
             val (gameRef) = issueTx.outRefsOfType<GameState>()
             val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
-            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
-            val (playerRevealRef) = reveal(playerRef, playerImage).outRefsOfType<RevealedState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage, gameRef).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef, playerImage, gameRef).outRefsOfType<RevealedState>()
             transaction {
                 input(casinoRevealRef.ref)
                 input(playerRevealRef.ref)
@@ -115,8 +119,8 @@ class GameContractResolveTests {
             val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
             val (gameRef) = issueTx.outRefsOfType<GameState>()
             val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
-            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
-            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage, gameRef).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage, gameRef).outRefsOfType<RevealedState>()
             transaction {
                 output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(400L, LockableTokenType)))
                 command(player.owningKey, Release(listOf(1), listOf(0)))
@@ -155,8 +159,8 @@ class GameContractResolveTests {
             val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
             val (gameRef) = issueTx.outRefsOfType<GameState>()
             val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
-            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
-            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage, gameRef).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage, gameRef).outRefsOfType<RevealedState>()
             transaction {
                 input(gameRef.ref)
                 command(player.owningKey, Resolve(0))
@@ -188,8 +192,8 @@ class GameContractResolveTests {
             val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
             val (gameRef) = issueTx.outRefsOfType<GameState>()
             val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
-            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
-            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage, gameRef).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage, gameRef).outRefsOfType<RevealedState>()
             transaction {
                 input(gameRef.ref)
                 command(player.owningKey, Resolve(0))
@@ -228,8 +232,8 @@ class GameContractResolveTests {
             val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
             val (gameRef) = issueTx.outRefsOfType<GameState>()
             val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
-            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
-            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage, gameRef).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage, gameRef).outRefsOfType<RevealedState>()
             transaction {
                 input(gameRef.ref)
                 command(player.owningKey, Resolve(0))
@@ -262,8 +266,8 @@ class GameContractResolveTests {
             val (casinoRef, playerRef1) = issueTx.outRefsOfType<CommittedState>()
             val (gameRef) = issueTx.outRefsOfType<GameState>()
             val (lockedRef) = issueTx.outRefsOfType<LockableTokenState>()
-            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
-            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage, gameRef).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage, gameRef).outRefsOfType<RevealedState>()
             transaction {
                 input(gameRef.ref)
                 command(player.owningKey, Resolve(0))
@@ -299,8 +303,8 @@ class GameContractResolveTests {
             val issueTx2 = issueTwoCommits(casinoImage.hash, playerImage.hash)
             val (gameRef2) = issueTx2.outRefsOfType<GameState>()
             val (lockedRef2) = issueTx2.outRefsOfType<LockableTokenState>()
-            val (casinoRevealRef) = reveal(casinoRef, casinoImage).outRefsOfType<RevealedState>()
-            val (playerRevealRef) = reveal(playerRef1, playerImage).outRefsOfType<RevealedState>()
+            val (casinoRevealRef) = reveal(casinoRef, casinoImage, gameRef).outRefsOfType<RevealedState>()
+            val (playerRevealRef) = reveal(playerRef1, playerImage, gameRef).outRefsOfType<RevealedState>()
             transaction {
                 input(gameRef.ref)
                 command(player.owningKey, Resolve(0))

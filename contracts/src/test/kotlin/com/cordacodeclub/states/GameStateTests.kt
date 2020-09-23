@@ -4,6 +4,7 @@ import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.CordaX500Name
 import net.corda.testing.core.TestIdentity
 import org.junit.Test
+import java.time.Instant
 import kotlin.test.assertFailsWith
 
 class GameStateTests {
@@ -19,47 +20,87 @@ class GameStateTests {
     fun `GameState must have at least 1 participant`() {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
-                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 0,
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
+                    Instant.now().plusSeconds(60), 0,
                     UniqueIdentifier(), listOf())
         }
-        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio  issuedBy issuer),
-                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 0,
+        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
+                Instant.now().plusSeconds(60), 0,
                 UniqueIdentifier(), listOf(alice))
     }
 
     @Test
     fun `GameState must has same issuer in bettors`() {
         assertFailsWith<IllegalArgumentException> {
-            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio  issuedBy alice),
-                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 1,
+            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy alice),
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
+                    Instant.now().plusSeconds(60), 1,
                     UniqueIdentifier(), listOf(alice, bob))
         }
-        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio  issuedBy issuer),
-                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 1,
+        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
+                Instant.now().plusSeconds(60), 1,
                 UniqueIdentifier(), listOf(alice, bob))
     }
 
     @Test
     fun `GameState must have different holders in bettors`() {
         assertFailsWith<IllegalArgumentException> {
-            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio  issuedBy issuer),
-                    alice commitsTo UniqueIdentifier() with (1L issuedBy issuer), 2,
+            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                    alice commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
+                    Instant.now().plusSeconds(60), 2,
                     UniqueIdentifier(), listOf(alice, bob))
         }
-        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio  issuedBy issuer),
-                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 2,
+        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
+                Instant.now().plusSeconds(60), 2,
+                UniqueIdentifier(), listOf(alice, bob))
+    }
+
+    @Test
+    fun `GameState commit deadline must come before reveal deadline`() {
+        val pointInTime = Instant.now()
+        assertFailsWith<IllegalArgumentException> {
+            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    pointInTime.plusSeconds(30),
+                    pointInTime.plusSeconds(29), 0,
+                    UniqueIdentifier(), listOf(alice, bob))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    pointInTime.plusSeconds(30),
+                    pointInTime.plusSeconds(30), 0,
+                    UniqueIdentifier(), listOf(alice, bob))
+        }
+        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                pointInTime.plusSeconds(30),
+                pointInTime.plusSeconds(31), 0,
                 UniqueIdentifier(), listOf(alice, bob))
     }
 
     @Test
     fun `GameState locked wagers output index must be positive`() {
         assertFailsWith<IllegalArgumentException> {
-            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio  issuedBy issuer),
-                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), -1,
+            GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
+                    Instant.now().plusSeconds(60), -1,
                     UniqueIdentifier(), listOf(alice, bob))
         }
-        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio  issuedBy issuer),
-                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 0,
+        GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
+                Instant.now().plusSeconds(60), 0,
                 UniqueIdentifier(), listOf(alice, bob))
     }
 
@@ -67,29 +108,41 @@ class GameStateTests {
     fun `GameState wagers need to be in proportion`() {
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio + 1L issuedBy issuer),
-                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), -1,
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
+                    Instant.now().plusSeconds(60), -1,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio - 1L issuedBy issuer),
-                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), -1,
+                    bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
+                    Instant.now().plusSeconds(60), -1,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (3 * GameState.maxPayoutRatio + 1L issuedBy issuer),
-                    bob commitsTo UniqueIdentifier() with (3L issuedBy issuer), 0,
+                    bob commitsTo UniqueIdentifier() with (3L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
+                    Instant.now().plusSeconds(60), 0,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         assertFailsWith<IllegalArgumentException> {
             GameState(alice commitsTo UniqueIdentifier() with (3 * GameState.maxPayoutRatio - 1L issuedBy issuer),
-                    bob commitsTo UniqueIdentifier() with (3L issuedBy issuer), 0,
+                    bob commitsTo UniqueIdentifier() with (3L issuedBy issuer),
+                    Instant.now().plusSeconds(30),
+                    Instant.now().plusSeconds(60), 0,
                     UniqueIdentifier(), listOf(alice, bob))
         }
         GameState(alice commitsTo UniqueIdentifier() with (GameState.maxPayoutRatio issuedBy issuer),
-                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer), 0,
+                bob commitsTo UniqueIdentifier() with (1L issuedBy issuer),
+                Instant.now().plusSeconds(30),
+                Instant.now().plusSeconds(60), 0,
                 UniqueIdentifier(), listOf(alice, bob))
         GameState(alice commitsTo UniqueIdentifier() with (3 * GameState.maxPayoutRatio issuedBy issuer),
-                bob commitsTo UniqueIdentifier() with (3L issuedBy issuer), 0,
+                bob commitsTo UniqueIdentifier() with (3L issuedBy issuer),
+                Instant.now().plusSeconds(30),
+                Instant.now().plusSeconds(60), 0,
                 UniqueIdentifier(), listOf(alice, bob))
     }
 }

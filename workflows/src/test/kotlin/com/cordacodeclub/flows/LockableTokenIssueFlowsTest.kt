@@ -30,12 +30,13 @@ class LockableTokenIssueFlowsTest {
 
     @Before
     fun setup() {
-        network = MockNetwork(MockNetworkParameters(cordappsForAllNodes = listOf(
-                TestCordapp.findCordapp("com.r3.corda.lib.accounts.contracts"),
-                TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
-                TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
-                TestCordapp.findCordapp("com.cordacodeclub.contracts"),
-                TestCordapp.findCordapp("com.cordacodeclub.flows"))))
+        network = MockNetwork(MockNetworkParameters()
+                .withCordappsForAllNodes(listOf(
+                        TestCordapp.findCordapp("com.r3.corda.lib.accounts.contracts"),
+                        TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
+                        TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
+                        TestCordapp.findCordapp("com.cordacodeclub.contracts"),
+                        TestCordapp.findCordapp("com.cordacodeclub.flows"))))
         issuerNode = network.createPartyNode(CordaX500Name.parse("O=Issuer, L=London, C=GB"))
         issuerNodeParty = issuerNode.info.legalIdentities.first()
         holderNode = network.createPartyNode(CordaX500Name.parse("O=Holder, L=Paris, C=FR"))

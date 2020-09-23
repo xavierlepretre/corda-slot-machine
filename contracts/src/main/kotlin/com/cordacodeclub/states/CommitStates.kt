@@ -6,38 +6,48 @@ import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.AbstractParty
 import net.corda.core.serialization.CordaSerializable
 import java.math.BigInteger
-import java.time.Instant
 import java.util.*
+
+interface CommitState : LinearState {
+    val hash: SecureHash
+    val creator: AbstractParty
+}
 
 @BelongsToContract(CommitContract::class)
 data class CommittedState(
-        val hash: SecureHash,
-        val creator: AbstractParty,
-        val revealDeadline: Instant,
+        override val hash: SecureHash,
+        override val creator: AbstractParty,
         val gameOutputIndex: Int, // Because it comes in the same tx, it cannot use a StaticPointer
         override val linearId: UniqueIdentifier,
         override val participants: List<AbstractParty> = listOf(creator)
-) : LinearState {
+) : CommitState {
     init {
         require(participants.contains(creator)) { "The creator must be a participant" }
     }
 }
 
-fun StateAndRef<CommittedState>.getGamePointer() = StaticPointer(
-        StateRef(this.ref.txhash, this.state.data.gameOutputIndex),
-        GameState::class.java)
+fun StateAndRef<CommitState>.getGamePointer() = when (state.data) {
+    is CommittedState -> StaticPointer(
+            StateRef(ref.txhash, (state.data as CommittedState).gameOutputIndex),
+            GameState::class.java)
+    is RevealedState -> (state.data as RevealedState).game
+    else -> throw IllegalArgumentException("Unhandled type ${state.data::class.java.name}")
+}
 
 @BelongsToContract(CommitContract::class)
 data class RevealedState(
         val image: CommitImage,
-        val creator: AbstractParty,
+        override val creator: AbstractParty,
         val game: StaticPointer<GameState>,
         override val linearId: UniqueIdentifier,
         override val participants: List<AbstractParty> = listOf(creator)
-) : LinearState {
+) : CommitState {
     init {
         require(participants.contains(creator)) { "The creator must be a participant" }
     }
+
+    override val hash: SecureHash
+        get() = image.hash
 }
 
 @CordaSerializable

@@ -41,6 +41,7 @@ class CommitContract : Contract {
                             verifyReveal(tx, command.value as Commands.Reveal)
                         is Commands.Use ->
                             verifyUse(tx, command.value as Commands.Use)
+                        is Commands.Close -> verifyClosure(tx, command.value as Commands.Close)
                     }
                     command.value
                 }
@@ -102,12 +103,13 @@ class CommitContract : Contract {
         "The creator must be unchanged" using (committedState.creator == revealedState.creator)
         "The game pointer must be unchanged" using (committedRef.getGamePointer() == revealedState.game)
 
-        "The game must be referenced" using tx.referenceInputRefsOfType<GameState>()
-                .any { it.ref == committedRef.getGamePointer().pointer }
+        val gameRef = tx.referenceInputRefsOfType<GameState>()
+                .singleOrNull { it.ref == committedRef.getGamePointer().pointer }
+        "The game must be referenced" using (gameRef != null)
 
         "The reveal deadline must be satisfied" using
                 (tx.timeWindow?.untilTime != null
-                        && tx.timeWindow?.untilTime!! <= committedState.revealDeadline)
+                        && tx.timeWindow?.untilTime!! <= gameRef!!.state.data.revealDeadline)
         // No signatures required
     }
 
@@ -119,6 +121,22 @@ class CommitContract : Contract {
                 .map { it.ref }
                 .contains(revealedState.game.pointer)
         // No signatures required as the winnings are calculated programmatically.
+    }
+
+    private fun verifyClosure(tx: LedgerTransaction, close: Commands.Close) {
+        requireThat {
+            "The input must be a CommittedState" using (tx.inputs[close.inputIndex].state.data is CommittedState)
+            @Suppress("UNCHECKED_CAST")
+            val committedStateAndRef = tx.inputs[close.inputIndex] as StateAndRef<CommittedState>
+            val gameRef = tx.inRefsOfType<GameState>()
+                    .singleOrNull { it.ref == committedStateAndRef.getGamePointer().pointer }
+            "The game must be in input" using (gameRef != null)
+            val gameState = gameRef!!.state.data
+            "There must be a time window from time" using (tx.timeWindow?.fromTime != null)
+            val fromTime = tx.timeWindow!!.fromTime
+            "The soft close earliest time must be satisfied" using (gameState.revealDeadline < fromTime)
+            // No signatures required as the winnings are calculated programmatically.
+        }
     }
 
     interface HasInput {
@@ -144,6 +162,12 @@ class CommitContract : Contract {
         }
 
         class Use(override val inputIndex: Int) : Commands(), HasInput {
+            init {
+                require(0 <= inputIndex) { "Index must be positive" }
+            }
+        }
+
+        class Close(override val inputIndex: Int) : Commands(), HasInput {
             init {
                 require(0 <= inputIndex) { "Index must be positive" }
             }

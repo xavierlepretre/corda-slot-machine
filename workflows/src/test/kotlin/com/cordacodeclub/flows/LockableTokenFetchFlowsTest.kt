@@ -1,13 +1,14 @@
 package com.cordacodeclub.flows
 
+import com.cordacodeclub.flows.LockableTokenFlows.Fetch.NotEnoughTokensException
 import com.cordacodeclub.states.LockableTokenState
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount
 import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingInitiator
 import net.corda.core.contracts.StateAndRef
-import net.corda.core.flows.FlowException
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
+import net.corda.core.utilities.getOrThrow
 import net.corda.testing.node.MockNetwork
 import net.corda.testing.node.MockNetworkParameters
 import net.corda.testing.node.StartedMockNode
@@ -17,7 +18,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.assertThrows
 import java.util.*
-import java.util.concurrent.ExecutionException
 import kotlin.test.assertEquals
 
 class LockableTokenFetchFlowsTest {
@@ -31,12 +31,13 @@ class LockableTokenFetchFlowsTest {
 
     @Before
     fun setup() {
-        network = MockNetwork(MockNetworkParameters(cordappsForAllNodes = listOf(
-                TestCordapp.findCordapp("com.r3.corda.lib.accounts.contracts"),
-                TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
-                TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
-                TestCordapp.findCordapp("com.cordacodeclub.contracts"),
-                TestCordapp.findCordapp("com.cordacodeclub.flows"))))
+        network = MockNetwork(MockNetworkParameters()
+                .withCordappsForAllNodes(listOf(
+                        TestCordapp.findCordapp("com.r3.corda.lib.accounts.contracts"),
+                        TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
+                        TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
+                        TestCordapp.findCordapp("com.cordacodeclub.contracts"),
+                        TestCordapp.findCordapp("com.cordacodeclub.flows"))))
         issuerNode = network.createPartyNode()
         issuerNodeParty = issuerNode.info.legalIdentities.first()
         holderNode = network.createPartyNode()
@@ -115,9 +116,8 @@ class LockableTokenFetchFlowsTest {
         val fetched = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
                 holder1, issuer, 201L, UUID.randomUUID()))
                 .also { network.runNetwork() }
-        val exception = assertThrows<ExecutionException> { fetched.get() }
-        assertEquals(FlowException::class.java, exception.cause!!::class.java)
-        assertEquals("Not enough tokens", exception.cause!!.message)
+        val exception = assertThrows<NotEnoughTokensException> { fetched.getOrThrow() }
+        assertEquals("Not enough tokens", exception.message)
     }
 
     @Test
@@ -137,9 +137,8 @@ class LockableTokenFetchFlowsTest {
         val fetched = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
                 holder1, issuer, 110L, UUID.randomUUID()))
                 .also { network.runNetwork() }
-        val exception = assertThrows<ExecutionException> { fetched.get() }
-        assertEquals(FlowException::class.java, exception.cause!!::class.java)
-        assertEquals("Not enough tokens", exception.cause!!.message)
+        val exception = assertThrows<NotEnoughTokensException> { fetched.getOrThrow() }
+        assertEquals("Not enough tokens", exception.message)
     }
 
     @Test
@@ -175,7 +174,7 @@ class LockableTokenFetchFlowsTest {
                 .get()
         assertEquals(2, fetched2.size)
         assertEquals(issuedTokens, fetched2)
-     }
+    }
 
     @Test
     fun `because of soft lock will fetch other token of holder just equal`() {
@@ -197,9 +196,8 @@ class LockableTokenFetchFlowsTest {
         val fetched3 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
                 holder1, issuer, 1L, UUID.randomUUID()))
                 .also { network.runNetwork() }
-        val exception = assertThrows<ExecutionException> { fetched3.get() }
-        assertEquals(FlowException::class.java, exception.cause!!::class.java)
-        assertEquals("Not enough tokens", exception.cause!!.message)
+        val exception = assertThrows<NotEnoughTokensException> { fetched3.getOrThrow() }
+        assertEquals("Not enough tokens", exception.message)
         holderNode.transaction { holderNode.services.vaultService.softLockRelease(fetchId1) }
         val fetched4 = holderNode.startFlow(LockableTokenFlows.Fetch.Local(
                 holder1, issuer, 1L, UUID.randomUUID()))
