@@ -103,7 +103,7 @@ class CommitContract : Contract {
         "The creator must be unchanged" using (committedState.creator == revealedState.creator)
         "The game pointer must be unchanged" using (committedRef.getGamePointer() == revealedState.game)
 
-        val gameRef =  tx.referenceInputRefsOfType<GameState>()
+        val gameRef = tx.referenceInputRefsOfType<GameState>()
                 .singleOrNull { it.ref == committedRef.getGamePointer().pointer }
         "The game must be referenced" using (gameRef != null)
 
@@ -123,17 +123,19 @@ class CommitContract : Contract {
         // No signatures required as the winnings are calculated programmatically.
     }
 
-    private fun verifyClosure(tx: LedgerTransaction, close: Commands.Close): StateAndRef<CommittedState> {
+    private fun verifyClosure(tx: LedgerTransaction, close: Commands.Close) {
         requireThat {
             "The input must be a CommittedState" using (tx.inputs[close.inputIndex].state.data is CommittedState)
             @Suppress("UNCHECKED_CAST")
             val committedStateAndRef = tx.inputs[close.inputIndex] as StateAndRef<CommittedState>
             val gameRef = tx.inRefsOfType<GameState>()
                     .singleOrNull { it.ref == committedStateAndRef.getGamePointer().pointer }
-            "The game must be referenced" using (gameRef != null)
-            "The reveal deadline must be satisfied" using (tx.timeWindow?.fromTime != null
-                    && gameRef!!.state.data.revealDeadline < tx.timeWindow?.fromTime!!)
-            return tx.inRef(close.inputIndex)
+            "The game must be in input" using (gameRef != null)
+            val gameState = gameRef!!.state.data
+            "There must be a time window from time" using (tx.timeWindow?.fromTime != null)
+            val fromTime = tx.timeWindow!!.fromTime
+            "The soft close earliest time must be satisfied" using (gameState.revealDeadline < fromTime)
+            // No signatures required as the winnings are calculated programmatically.
         }
     }
 

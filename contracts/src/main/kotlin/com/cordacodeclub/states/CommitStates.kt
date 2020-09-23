@@ -26,9 +26,13 @@ data class CommittedState(
     }
 }
 
-fun StateAndRef<CommittedState>.getGamePointer() = StaticPointer(
-        StateRef(this.ref.txhash, this.state.data.gameOutputIndex),
-        GameState::class.java)
+fun StateAndRef<CommitState>.getGamePointer() = when (state.data) {
+    is CommittedState -> StaticPointer(
+            StateRef(ref.txhash, (state.data as CommittedState).gameOutputIndex),
+            GameState::class.java)
+    is RevealedState -> (state.data as RevealedState).game
+    else -> throw IllegalArgumentException("Unhandled type ${state.data::class.java.name}")
+}
 
 @BelongsToContract(CommitContract::class)
 data class RevealedState(
