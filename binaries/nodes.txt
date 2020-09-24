@@ -4,18 +4,21 @@ sudo USEORACLEJDK=true ONE_TIME_DOWNLOAD_KEY=5d57752d-a3a5-48ff-8f6d-9d563b9e712
 
 OU=C99f09a4f-bcaa-4905-85a9-6b1442201239, O=TESTNET_B9lab, L=London, C=GB
 
-Put corda.service in /etc/systemd/system/corda.service, then:
-$ sudo systemctl daemon-reload
-$ sudo systemctl enable corda
-$ sudo systemctl start corda
-$ sudo systemctl stop corda
-
-For clients
-sudo -u corda java -jar cordapps/clients-0.1.jar --server.port=8080 --config.rpc.host=127.0.0.1 --config.rpc.port=10003 --config.rpc.username=rpcuser --config.rpc.password=ChangeTh1sPa$$w0rd
-
-
 Parties:
 sudo USEORACLEJDK=true ONE_TIME_DOWNLOAD_KEY=22965015-443b-4d16-b75b-aa56d3911239 O=CordaCodeClubWizard OU=Parties WEBSERVER=true bash -c "$(curl -L https://onboarder.prod.ws.r3.com/api/user/node/TESTNET/install.sh)"
 sudo USEORACLEJDK=true ONE_TIME_DOWNLOAD_KEY=22965015-443b-4d16-b75b-aa56d3911239 O=CordaCodeClubWizard OU=Parties WEBSERVER=true ./install.sh
 
 OU=C6102a286-98d3-44a5-a47c-5f3de80ee74e, O=TESTNET_B9lab, L=London, C=GB
+
+Removed OpenJDK and installed Oracle JDK 8 on Parties server:
+https://www.fosstechnix.com/install-oracle-java-8-on-ubuntu-20-04/
+
+For clients when it is possible
+sudo -u corda java -jar cordapps/clients-0.1.jar --server.port=8080 --config.rpc.host=127.0.0.1 --config.rpc.port=10003 --config.rpc.username=rpcuser --config.rpc.password=ChangeTh1sPa$$w0rd
+
+On both:
+Put corda.service in /etc/systemd/system/corda.service, then:
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable corda
+$ sudo systemctl start corda
+$ sudo systemctl stop corda
