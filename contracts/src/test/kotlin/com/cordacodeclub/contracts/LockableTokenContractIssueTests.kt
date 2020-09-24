@@ -75,7 +75,8 @@ class LockableTokenContractIssueTests {
             command(issuer.owningKey, Issue(listOf(0, 1)))
 
             tweak {
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType),
+                        listOf(casino, player)))
                 failsWith("The outputs must be unlocked")
             }
 
