@@ -43,7 +43,8 @@ class LockableTokenContractLockTests {
     @Test
     fun `Inputs must be lockable tokens`() {
         ledgerServices.transaction {
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                    listOf(casino, player)))
             command(casino.owningKey, Lock(listOf(0), listOf(0)))
 
             tweak {
@@ -67,7 +68,8 @@ class LockableTokenContractLockTests {
                 failsWith("The outputs must be lockable token states")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                    listOf(casino, player)))
             verifies()
         }
     }
@@ -80,11 +82,13 @@ class LockableTokenContractLockTests {
             command(casino.owningKey, Lock(listOf(0, 1), listOf(0)))
 
             tweak {
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(0, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(0, LockableTokenType),
+                        listOf(casino, player)))
                 failsWith("The outputs must have positive amounts")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                    listOf(casino, player)))
             verifies()
         }
     }
@@ -93,7 +97,8 @@ class LockableTokenContractLockTests {
     fun `Inputs must have a single issuer`() {
         ledgerServices.transaction {
             input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(1, LockableTokenType)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(4, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(4, LockableTokenType),
+                    listOf(casino, player)))
             command(casino.owningKey, Lock(listOf(0, 1), listOf(0)))
 
             tweak {
@@ -110,15 +115,18 @@ class LockableTokenContractLockTests {
     fun `Outputs must have a single issuer`() {
         ledgerServices.transaction {
             input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(4, LockableTokenType)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType),
+                    listOf(casino, player)))
             command(casino.owningKey, Lock(listOf(0), listOf(0, 1)))
 
             tweak {
-                output(LockableTokenContract.id, LockableTokenState(player, Amount(3, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(player, Amount(3, LockableTokenType),
+                        listOf(casino, player)))
                 failsWith("The outputs must have a single issuer")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType),
+                    listOf(casino, player)))
             verifies()
         }
     }
@@ -130,11 +138,13 @@ class LockableTokenContractLockTests {
             command(casino.owningKey, Lock(listOf(0), listOf(0)))
 
             tweak {
-                output(LockableTokenContract.id, LockableTokenState(player, Amount(3, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(player, Amount(3, LockableTokenType),
+                        listOf(casino, player)))
                 failsWith("The input and output issuers must be the same")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType),
+                    listOf(casino, player)))
             verifies()
         }
     }
@@ -146,11 +156,13 @@ class LockableTokenContractLockTests {
             command(casino.owningKey, Lock(listOf(0), listOf(0)))
 
             tweak {
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                        listOf(casino, player)))
                 failsWith("The sums must be unchanged")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType),
+                    listOf(casino, player)))
             verifies()
         }
     }
@@ -158,12 +170,15 @@ class LockableTokenContractLockTests {
     @Test
     fun `There must be unlocked inputs`() {
         ledgerServices.transaction {
-            input(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType)))
+            input(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType),
+                    listOf(casino, player)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType),
+                    listOf(casino, player)))
             command(casino.owningKey, Lock(listOf(0, 1), listOf(0)))
 
             tweak {
-                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
+                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                        listOf(casino, player)))
                 failsWith("There must be unlocked inputs")
             }
 
@@ -184,7 +199,8 @@ class LockableTokenContractLockTests {
                 failsWith("There must be locked outputs")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                    listOf(casino, player)))
             verifies()
         }
     }
@@ -195,37 +211,45 @@ class LockableTokenContractLockTests {
             input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(3, LockableTokenType)))
 
             tweak {
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                        listOf(casino, player)))
                 output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(1, LockableTokenType)))
                 command(casino.owningKey, Lock(listOf(0), listOf(0, 1)))
                 verifies()
             }
 
             tweak {
-                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType)))
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
+                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType),
+                        listOf(casino, player)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                        listOf(casino, player)))
                 output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(2, LockableTokenType)))
                 command(casino.owningKey, Lock(listOf(0, 1), listOf(0, 1)))
                 verifies()
             }
 
             tweak {
-                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType)))
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType)))
+                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType),
+                        listOf(casino, player)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType),
+                        listOf(casino, player)))
                 output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(3, LockableTokenType)))
                 command(casino.owningKey, Lock(listOf(0, 1), listOf(0, 1)))
                 failsWith("The locked sums must increase")
             }
 
             tweak {
-                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType)))
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType)))
+                input(LockableTokenContract.id, LockableTokenState(issuer, Amount(2, LockableTokenType),
+                        listOf(casino, player)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType),
+                        listOf(casino, player)))
                 output(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(4, LockableTokenType)))
                 command(casino.owningKey, Lock(listOf(0, 1), listOf(0, 1)))
                 failsWith("The locked sums must increase")
             }
 
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType),
+                    listOf(casino, player)))
             command(casino.owningKey, Lock(listOf(0), listOf(0)))
             verifies()
         }
@@ -234,10 +258,12 @@ class LockableTokenContractLockTests {
     @Test
     fun `Unlocked input holders must sign`() {
         ledgerServices.transaction {
-            input(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType)))
+            input(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType),
+                    listOf(casino, player)))
             input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(2, LockableTokenType)))
             input(LockableTokenContract.id, LockableTokenState(player, issuer, Amount(4, LockableTokenType)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(7, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(7, LockableTokenType),
+                    listOf(casino, player)))
 
             tweak {
                 command(player.owningKey, Lock(listOf(0, 1, 2), listOf(0)))
@@ -258,7 +284,8 @@ class LockableTokenContractLockTests {
     fun `All covered lockable token states must not overlap`() {
         ledgerServices.transaction {
             input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(3, LockableTokenType)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType),
+                    listOf(casino, player)))
             command(casino.owningKey, Lock(listOf(0), listOf(0)))
             verifies()
 
@@ -279,7 +306,8 @@ class LockableTokenContractLockTests {
     fun `All lockable token states must be covered by a command`() {
         ledgerServices.transaction {
             input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(3, LockableTokenType)))
-            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType)))
+            output(LockableTokenContract.id, LockableTokenState(issuer, Amount(3, LockableTokenType),
+                    listOf(casino, player)))
 
             tweak {
                 input(LockableTokenContract.id, LockableTokenState(casino, issuer, Amount(1, LockableTokenType)))
@@ -288,7 +316,8 @@ class LockableTokenContractLockTests {
             }
 
             tweak {
-                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType)))
+                output(LockableTokenContract.id, LockableTokenState(issuer, Amount(1, LockableTokenType),
+                        listOf(casino, player)))
                 command(casino.owningKey, Lock(listOf(0), listOf(0)))
                 failsWith("All lockable token outputs must be covered by a command")
             }
