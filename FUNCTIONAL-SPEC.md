@@ -172,11 +172,10 @@ A "lockable token" is (like any other token) a Corda state, whose behaviour is c
 
   Locking a token requires the owner's signature.
 
-- The game contract allows a transaction to assign the locked tokens to the winner of the game, without requiring the
-  owner's signature.
+- The game contract allows a transaction to "release" the locked tokens and assign them to the winner of the game, without requiring the former owner's signature.
 
   The owner's signature was only required earlier, i.e. to "lock" the token and assign it to the game contract.
-  The game's final transaction only requires the signature of the winner.
+  The game's final transaction only requires the signature of the winner, or any signature really as the contract is fully in control.
 
 ### What about an escrow account?
 
@@ -209,7 +208,8 @@ In more detail:
 2. The Casino node reveals its secret to the Player node
 3. The Player node reveals its secret to the Casino node
 4. Whichever is the winning node combines the two secrets,
-   into a single final "reveal" transaction which finishes the game
+   into a single final "reveal" transaction which finishes the game. In the current 
+   implementation, the player finishes the game.
 
 The reveal is asymmetric i.e. "Casino reveals before the Player" -- for reasons explained later, in the first two
 subsections of [Preventing malicious timeouts](#preventing-malicious-timeouts).
@@ -248,6 +248,8 @@ Even without this timeout being specified, the Casino has no obvious incentive t
 because the Casino reveals first, at this stage the Casino doesn't know the Player's secret and therefore
 cannot know that it's about to lose the game.
 
+To further incentivise revealing, we could associate additional locked tokens that are released on revealing.
+
 ### What if the Player doesn't send the notarised commit to the Casino?
 
 The threat here is:
@@ -265,7 +267,7 @@ within a reasonable time of its sending its commit hash.
 2. The Player may or may not create and notarise the commit transaction, but in any case doesn't send it to Casino
 3. Before the timeout which would allow the Player to foreclose, the Casino cancels the game.
 
-To cancel the game, the Casino simply unlocks the tokens which it had committed to the game:
+To cancel the game, the Casino simply releases the tokens which it had committed to the game:
 
 - If the Player hadn't yet notarised the commit transaction, then the commit will fail -- because the Casino's
   input tokens have been cancelled, i.e. the "locked" state of the Casino's tokens (attached as input to the commit
@@ -323,11 +325,10 @@ Here is a list of transaction types i.e. commands:
 
 - On the happy path:
 
-  - "Casino lock" -- Casino locks a token before the commit
-  - "Commit" -- consume commit hashes and tokens from both parties
-  - "Casino reveal" -- consumes the Casino's game state,
+  - "Atomic commit and lock" -- locks tokens from both parties, commits hashes from both parties and creates a game state,
+  - "Casino reveal" -- consumes the Casino's commit state and creates the Casino's revealed state,
     prevents the Casino's cancelling and prevents the Player's foreclosing
-  - "Player reveal" -- consumes the Player's game state,
+  - "Player reveal" -- consumes the Player's commit state and creates the Player's revealed state,
     prevents the Casino's foreclosing
   - "Finalise" -- combines the two reveals, calculates the winner and the amount of winnings,
     and unlocks the tokens in favour of the winner.
@@ -426,7 +427,7 @@ In theory we could introduce another node, a "Bank" node, whose responsibility i
 Instead, to keep it as simple as possible, in the demo the tokens are all issued by the Casino node.
 
 - The Casino can issue itself as many token as it needs
-- Each new end-users is automatically issued an initial store of 50 tokens, when they first begin to play.
+- Each new end-users is automatically issued an initial store of 100 tokens, when they first begin to play.
 
 ### Web server
 
@@ -462,12 +463,14 @@ There are further details about the web implementation -- irrelevant to Corda --
 
 ### Initiating flows
 
-There are three flows which may be initiated by the web server:
+There are four flows which may be initiated by the web server:
 
-- `CreateUserAccount` and `GetUserBalance` -- defined in
-  [`CreateUserAccount.kt`](workflows/src/main/kotlin/com/cordacodeclub/flows/CreateUserAccount.kt)
-- `InitiatePlayGame` -- defined in
-  [`InitiatePlayGame.kt`](workflows/src/main/kotlin/com/cordacodeclub/flows/InitiatePlayGame.kt)
+- `UserAccountFlows.Create.Initiator` -- defined in
+  [`UserAccountFlows.kt`](workflows/src/main/kotlin/com/cordacodeclub/flows/UserAccountFlows.kt)
+- `LockableTokenFlows.Issue.InitiatorBeg` -- defined in [`LockableTokenFlows`](workflows/src/main/kotlin/com/cordacodeclub/flows/LockableTokenFlows.kt), which allows the new player to be issued 100 tokens
+- `LockableTokenFlows.Balance.Local` and `LockableTokenFlows.Balance.SimpleLocal` -- defined  in [`LockableTokenFlows`](workflows/src/main/kotlin/com/cordacodeclub/flows/LockableTokenFlows.kt)
+- `GameFlows.SimpleInitiator` -- defined in
+  [`GameFlows.kt`](workflows/src/main/kotlin/com/cordacodeclub/flows/GameFlows.kt), which orchestrates the whole commit-reveal and resolve process across multiple transactions
 
 ## Summary
 
@@ -497,18 +500,21 @@ In any case the contracts are not defined in this Functional Specification, but 
 
 The odds of winning are defined in the contract.
 
-TODO: Where is this source file?
+Defined in [`GameContract`](contracts/src/main/kotlin/com/cordacodeclub/contracts/GameContract.kt) and [`CommitImage`](contracts/src/main/kotlin/com/cordacodeclub/states/CommitStates.kt)
 
 ### Verification
 
-TODO: Anything to say about how we verify ...
+- For contracts, we implemented extensive unit tests.
+- For flows, we tested the happy path and a couple of un-happy paths via the use of broken game flows.
 
 - That this specification is sufficient i.e. threat-proof?
 - That the CorDapp is implement as specified?
 
 ### Performance
 
-TODO: What about performance testing?
+On a reasonable development computer, we have observed the speed of a game flow to be between 2 and 2.5 seconds.
+
+On a 2-AWS instances setup, we have observed the speeds of a game flow to be between 1 and 1.5 seconds.
 
 ### Last words
 
