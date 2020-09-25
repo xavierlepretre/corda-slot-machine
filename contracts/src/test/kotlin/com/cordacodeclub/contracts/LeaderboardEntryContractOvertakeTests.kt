@@ -42,8 +42,8 @@ class LeaderboardEntryContractOvertakeTests {
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(21, LockableTokenType)))
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
 
             tweak {
                 command(player.owningKey, Overtake(1, 0))
@@ -66,8 +66,8 @@ class LeaderboardEntryContractOvertakeTests {
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(21, LockableTokenType)))
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
 
             tweak {
                 command(player.owningKey, Overtake(0, 1))
@@ -90,8 +90,8 @@ class LeaderboardEntryContractOvertakeTests {
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(29, LockableTokenType)))
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             failsWith("The referenced tokens sum must match the entry total")
 
             reference(LockableTokenContract.id,
@@ -117,8 +117,8 @@ class LeaderboardEntryContractOvertakeTests {
             failsWith("There must be a time-window")
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             verifies()
         }
     }
@@ -140,8 +140,8 @@ class LeaderboardEntryContractOvertakeTests {
             failsWith("There must be a time-window with 2 bounds")
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             verifies()
         }
     }
@@ -157,23 +157,23 @@ class LeaderboardEntryContractOvertakeTests {
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(30, LockableTokenType)))
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(61),
-                    creationDate.plusSeconds(59)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius.plusSeconds(1)),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius.minusSeconds(1))))
             failsWith("The time-window bounds must not be far from the creation date")
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(59),
-                    creationDate.plusSeconds(61)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius.minusSeconds(1)),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius.plusSeconds(1))))
             failsWith("The time-window bounds must not be far from the creation date")
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             verifies()
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(59),
-                    creationDate.plusSeconds(59)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius.minusSeconds(1)),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius.minusSeconds(1))))
             verifies()
         }
     }
@@ -188,8 +188,8 @@ class LeaderboardEntryContractOvertakeTests {
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(21, LockableTokenType)))
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
 
             tweak {
                 command(issuer.owningKey, Overtake(0, 0))

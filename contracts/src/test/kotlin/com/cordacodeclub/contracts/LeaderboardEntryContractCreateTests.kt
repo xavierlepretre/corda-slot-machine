@@ -37,8 +37,8 @@ class LeaderboardEntryContractCreateTests {
                     LockableTokenState(player, issuer, Amount(20, LockableTokenType)))
             command(player.owningKey, DummyContract.Commands.Create())
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             failsWith("The LeaderboardEntryContract must find at least 1 command")
 
             command(player.owningKey, Create(0))
@@ -55,8 +55,8 @@ class LeaderboardEntryContractCreateTests {
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(21, LockableTokenType)))
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
 
             tweak {
                 command(player.owningKey, Create(1))
@@ -77,8 +77,8 @@ class LeaderboardEntryContractCreateTests {
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(29, LockableTokenType)))
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             failsWith("The referenced tokens sum must match the entry total")
 
             reference(LockableTokenContract.id,
@@ -102,8 +102,8 @@ class LeaderboardEntryContractCreateTests {
             failsWith("There must be a time-window")
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             verifies()
         }
     }
@@ -116,15 +116,15 @@ class LeaderboardEntryContractCreateTests {
             command(player.owningKey, Create(0))
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(30, LockableTokenType)))
-            timeWindow(TimeWindow.fromOnly(creationDate.plusSeconds(60)))
+            timeWindow(TimeWindow.fromOnly(creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             failsWith("There must be a time-window with 2 bounds")
 
-            timeWindow(TimeWindow.untilOnly(creationDate.minusSeconds(60)))
+            timeWindow(TimeWindow.untilOnly(creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius)))
             failsWith("There must be a time-window with 2 bounds")
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             verifies()
         }
     }
@@ -138,23 +138,23 @@ class LeaderboardEntryContractCreateTests {
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(30, LockableTokenType)))
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(61),
-                    creationDate.plusSeconds(59)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius.plusSeconds(1)),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius.minusSeconds(1))))
             failsWith("The time-window bounds must not be far from the creation date")
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(59),
-                    creationDate.plusSeconds(61)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius.minusSeconds(1)),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius.plusSeconds(1))))
             failsWith("The time-window bounds must not be far from the creation date")
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
             verifies()
 
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(59),
-                    creationDate.plusSeconds(59)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius.minusSeconds(1)),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius.minusSeconds(1))))
             verifies()
         }
     }
@@ -167,8 +167,8 @@ class LeaderboardEntryContractCreateTests {
             reference(LockableTokenContract.id,
                     LockableTokenState(player, issuer, Amount(21, LockableTokenType)))
             timeWindow(TimeWindow.between(
-                    creationDate.minusSeconds(60),
-                    creationDate.plusSeconds(60)))
+                    creationDate.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                    creationDate.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
 
             tweak {
                 command(issuer.owningKey, Create(0))
