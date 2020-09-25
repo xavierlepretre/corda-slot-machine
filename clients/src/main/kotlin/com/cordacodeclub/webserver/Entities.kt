@@ -36,3 +36,10 @@ data class SpinResult(
             lifetime_winnings = 0,
             last_win = 0)
 }
+
+data class LeaderboardEntryResult(
+        val success: Boolean,
+        val error: String?) {
+    constructor() : this(true, null)
+    constructor(error: String) : this(false, error)
+}
