@@ -14,7 +14,7 @@ import javax.persistence.Table
 object LockableTokenSchema
 
 /**
- * An LockableTokenState schema.
+ * A LockableTokenState schema.
  */
 object LockableTokenSchemaV1 : MappedSchema(
         schemaFamily = LockableTokenSchema.javaClass,
