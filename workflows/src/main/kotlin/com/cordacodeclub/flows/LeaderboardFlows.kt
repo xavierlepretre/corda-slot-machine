@@ -22,6 +22,8 @@ import java.time.Instant
 
 object LeaderboardFlows {
 
+    const val maxLeaderboardLength = 20;
+
     object Create {
 
         @StartableByRPC
@@ -64,6 +66,7 @@ object LeaderboardFlows {
 
             companion object {
                 object FetchingTokens : ProgressTracker.Step("Fetching tokens.")
+                object FetchingCurrentLeaderboard : ProgressTracker.Step("Fetching current leaderboard.")
                 object GeneratingTransaction : ProgressTracker.Step("Generating transaction.")
                 object VerifyingTransaction : ProgressTracker.Step("Verifying transaction.")
                 object SigningTransaction : ProgressTracker.Step("Signing transaction.")
@@ -73,6 +76,7 @@ object LeaderboardFlows {
 
                 fun tracker() = ProgressTracker(
                         FetchingTokens,
+                        FetchingCurrentLeaderboard,
                         GeneratingTransaction,
                         VerifyingTransaction,
                         SigningTransaction,
@@ -83,22 +87,47 @@ object LeaderboardFlows {
             override fun call(): SignedTransaction {
                 progressTracker.currentStep = FetchingTokens
                 val tokenStates = subFlow(Information.Local(player, tokenIssuer))
-                val total = tokenStates.map { it.state.data }
+                val playerTotal = tokenStates.map { it.state.data }
                         .reduce(LockableTokenState::plus)
                         .amount
 
+                progressTracker.currentStep = FetchingCurrentLeaderboard
+                val leaderboard = subFlow(Fetch.Local(tokenIssuer))
+                val entriesToKeep = leaderboard.take(maxLeaderboardLength)
+                val entriesToRetire = leaderboard.drop(maxLeaderboardLength)
+                val entryToOvertake =
+                        if (entriesToKeep.size == maxLeaderboardLength
+                                && leaderboard.last().state.data.total < playerTotal) entriesToKeep.last()
+                        else if (entriesToKeep.size == maxLeaderboardLength)
+                            throw FlowException("The player does not qualify to enter the leaderboard")
+                        else null
+                if (entriesToKeep.map { it.state.data }.any { it.player == player && it.total == playerTotal })
+                    throw FlowException("Same player cannot enter the leaderboard with identical total")
+
                 progressTracker.currentStep = GeneratingTransaction
                 val notary = tokenStates.map { it.state.notary }
+                        .distinct()
                         .singleOrNull()
                         ?: throw FlowException("Tokens are not controlled by a single notary")
                 val now = Instant.now()
                 val participants = observers.plus(player).distinct()
                 val builder = TransactionBuilder(notary)
-                        .addCommand(LeaderboardEntryContract.Commands.Create(0), player.owningKey)
-                        .addOutputState(LeaderboardEntryState(player, total,
-                                tokenIssuer, now, UniqueIdentifier(), participants))
-                        .setTimeWindow(TimeWindow.between(now.minus(LeaderboardEntryContract.maxTimeWindowRadius),
-                                now.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
+                if (entryToOvertake == null) {
+                    builder.addCommand(LeaderboardEntryContract.Commands.Create(0), player.owningKey)
+                } else {
+                    builder.addCommand(LeaderboardEntryContract.Commands.Overtake(0, 0), player.owningKey)
+                            .addInputState(entryToOvertake)
+                }
+                builder.addOutputState(LeaderboardEntryState(player, playerTotal,
+                        tokenIssuer, now, UniqueIdentifier(), participants))
+                entriesToRetire.forEach {
+                    builder.addCommand(
+                            LeaderboardEntryContract.Commands.Retire(builder.inputStates().size),
+                            it.state.data.player.owningKey)
+                            .addInputState(it)
+                }
+                builder.setTimeWindow(TimeWindow.between(now.minus(LeaderboardEntryContract.maxTimeWindowRadius),
+                        now.plus(LeaderboardEntryContract.maxTimeWindowRadius)))
                 tokenStates.forEach {
                     builder.addReferenceState(ReferencedStateAndRef(it))
                 }
