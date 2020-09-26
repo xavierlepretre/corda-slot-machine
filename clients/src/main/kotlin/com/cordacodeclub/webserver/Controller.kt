@@ -113,6 +113,21 @@ class Controller(rpc: NodeRPCConnection) {
         }
     }
 
+    @GetMapping(value = ["/leaderboard"], produces = ["application/json"])
+    private fun getLeaderboard(request: HttpServletRequest): ResponseEntity<Any> {
+        return try {
+            val leaderboardEntries = proxy.startFlow(LeaderboardFlows.Fetch::Local,
+                    casino, LeaderboardFlows.Create.SimpleInitiator.tracker())
+                    .returnValue.getOrThrow()
+                    .map { it.state.data }
+                    .map { LeaderboardEntry(it.total.quantity, it.creationDate.toString(), it.linearId.id.toString()) }
+            ResponseEntity.ok(Leaderboard(leaderboardEntries))
+        } catch (error: Exception) {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed $error")
+        }
+    }
+
     // the following are just for testing, not used in production
 
     @GetMapping(value = ["/test"], produces = ["text/plain"])

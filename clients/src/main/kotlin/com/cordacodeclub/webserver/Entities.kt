@@ -43,3 +43,11 @@ data class LeaderboardEntryResult(
     constructor() : this(true, null)
     constructor(error: String) : this(false, error)
 }
+
+// Do not add the player's account name as at the moment we count on it to be like a password.
+data class LeaderboardEntry(
+        val total: Long,
+        val creationDate: String,
+        val linearId: String)
+
+data class Leaderboard(val entries: List<LeaderboardEntry>)
