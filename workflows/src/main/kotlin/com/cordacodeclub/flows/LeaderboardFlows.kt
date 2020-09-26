@@ -3,14 +3,18 @@ package com.cordacodeclub.flows
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.LeaderboardEntryContract
 import com.cordacodeclub.flows.LockableTokenFlows.Information
+import com.cordacodeclub.schema.LeaderboardEntrySchemaV1
 import com.cordacodeclub.states.LeaderboardEntryState
 import com.cordacodeclub.states.LockableTokenState
 import net.corda.core.contracts.ReferencedStateAndRef
+import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.*
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
+import net.corda.core.node.services.Vault
+import net.corda.core.node.services.vault.*
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
@@ -135,6 +139,66 @@ object LeaderboardFlows {
             override fun call(): SignedTransaction {
                 progressTracker.currentStep = FinalisingTransaction
                 return subFlow(ReceiveFinalityFlow(issuerSession))
+            }
+        }
+    }
+
+    object Fetch {
+        @StartableByRPC
+        class Local(private val tokenIssuer: AbstractParty,
+                    override val progressTracker: ProgressTracker = tracker())
+            : FlowLogic<List<StateAndRef<LeaderboardEntryState>>>() {
+
+            companion object {
+                object PreparingCriteria : ProgressTracker.Step("Preparing criteria.")
+                object QueryingVault : ProgressTracker.Step("Querying vault.")
+                object ReturningResult : ProgressTracker.Step("Returning result.")
+
+                fun tracker() = ProgressTracker(
+                        PreparingCriteria,
+                        QueryingVault,
+                        ReturningResult)
+            }
+
+            @Suspendable
+            override fun call(): List<StateAndRef<LeaderboardEntryState>> {
+                progressTracker.currentStep = PreparingCriteria
+                val criteria = QueryCriteria.VaultQueryCriteria(
+                        contractStateTypes = setOf(LeaderboardEntryState::class.java),
+                        relevancyStatus = Vault.RelevancyStatus.ALL,
+                        status = Vault.StateStatus.UNCONSUMED
+                ).and(QueryCriteria.VaultCustomQueryCriteria(builder {
+                    LeaderboardEntrySchemaV1.PersistentLeaderboardEntry::tokenIssuer.equal(tokenIssuer.owningKey.encoded)
+                }))
+                val totalSortAttribute = SortAttribute.Custom(
+                        LeaderboardEntrySchemaV1.PersistentLeaderboardEntry::class.java,
+                        LeaderboardEntrySchemaV1.COL_TOTAL)
+                val creationSortAttribute = SortAttribute.Custom(
+                        LeaderboardEntrySchemaV1.PersistentLeaderboardEntry::class.java,
+                        LeaderboardEntrySchemaV1.COL_CREATION)
+                val sorter = Sort(setOf(
+                        Sort.SortColumn(totalSortAttribute, Sort.Direction.DESC),
+                        Sort.SortColumn(creationSortAttribute, Sort.Direction.ASC)))
+
+                progressTracker.currentStep = QueryingVault
+                var pageNumber = DEFAULT_PAGE_NUM
+                val fetched = mutableListOf<StateAndRef<LeaderboardEntryState>>()
+                do {
+                    val pageSpec = PageSpecification(pageNumber = pageNumber, pageSize = LockableTokenFlows.Fetch.PAGE_SIZE_DEFAULT)
+                    val results = serviceHub.vaultService.queryBy(
+                            LeaderboardEntryState::class.java, criteria, pageSpec, sorter)
+                    for (state in results.states) {
+                        // TODO confirm that this should never happen. Worried about ByteArray's length.
+                        // https://github.com/xavierlepretre/corda-slot-machine/issues/23
+                        if (state.state.data.let { it.tokenIssuer != tokenIssuer })
+                            throw FlowException("The query returned a state that had wrong token issuer")
+                        fetched += state
+                    }
+                    pageNumber++
+                } while (pageSpec.pageSize * (pageNumber - 1) <= results.totalStatesAvailable)
+
+                progressTracker.currentStep = ReturningResult
+                return fetched
             }
         }
     }

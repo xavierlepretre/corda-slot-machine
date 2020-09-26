@@ -37,8 +37,9 @@ data class LeaderboardEntryState(
         return when (schema) {
             is LeaderboardEntrySchemaV1 -> LeaderboardEntrySchemaV1.PersistentLeaderboardEntry(
                     this.player.owningKey.encoded,
+                    this.total.quantity,
                     this.tokenIssuer.owningKey.encoded,
-                    this.total.quantity
+                    this.creationDate
             )
             else -> throw IllegalArgumentException("Unrecognised schema $schema")
         }
