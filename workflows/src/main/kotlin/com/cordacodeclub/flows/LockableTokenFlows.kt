@@ -355,7 +355,7 @@ object LockableTokenFlows {
                 val fetched = mutableListOf<StateAndRef<LockableTokenState>>()
                 do {
                     val pageSpec = PageSpecification(pageNumber = pageNumber, pageSize = PAGE_SIZE_DEFAULT)
-                    val results: Vault.Page<LockableTokenState> = serviceHub.vaultService.queryBy(
+                    val results = serviceHub.vaultService.queryBy(
                             LockableTokenState::class.java, criteria, pageSpec)
                     for (state in results.states) {
                         // TODO confirm that this should never happen. Worried about ByteArray's length.

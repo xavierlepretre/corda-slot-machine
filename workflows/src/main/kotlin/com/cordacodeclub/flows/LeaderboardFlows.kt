@@ -20,6 +20,7 @@ object LeaderboardFlows {
 
     object Create {
 
+        @StartableByRPC
         class SimpleInitiator(private val playerAccountName: String,
                               private val tokenIssuer: AbstractParty,
                               private val observers: List<Party> = listOf(),
@@ -51,6 +52,7 @@ object LeaderboardFlows {
         }
 
         @InitiatingFlow
+        @StartableByRPC
         class Initiator(private val player: AbstractParty,
                         private val tokenIssuer: AbstractParty,
                         private val observers: List<Party> = listOf(),

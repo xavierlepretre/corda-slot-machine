@@ -21,7 +21,7 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
 
-class LeaderboardFlowTest {
+class LeaderboardCreateFlowTest {
     private lateinit var network: MockNetwork
     private lateinit var issuerNode: StartedMockNode
     private lateinit var issuerNodeParty: Party
