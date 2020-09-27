@@ -42,6 +42,30 @@ class MoreThanOneAccountFoundException(message: String?, cause: Throwable?, orig
     constructor() : this(null, null)
 }
 
+class NoTokensForLeaderboardException(message: String?, cause: Throwable?, originalErrorId: Long? = null) :
+        FlowException(message, cause, originalErrorId), IdentifiableException {
+    constructor(message: String?, cause: Throwable?) : this(message, cause, null)
+    constructor(message: String?) : this(message, null)
+    constructor(cause: Throwable?) : this(cause?.toString(), cause)
+    constructor() : this(null, null)
+}
+
+class ScoreTooLowForLeaderboardException(message: String?, cause: Throwable?, originalErrorId: Long? = null) :
+        FlowException(message, cause, originalErrorId), IdentifiableException {
+    constructor(message: String?, cause: Throwable?) : this(message, cause, null)
+    constructor(message: String?) : this(message, null)
+    constructor(cause: Throwable?) : this(cause?.toString(), cause)
+    constructor() : this(null, null)
+}
+
+class NothingToRetireFromLeaderboardException(message: String?, cause: Throwable?, originalErrorId: Long? = null) :
+        FlowException(message, cause, originalErrorId), IdentifiableException {
+    constructor(message: String?, cause: Throwable?) : this(message, cause, null)
+    constructor(message: String?) : this(message, null)
+    constructor(cause: Throwable?) : this(cause?.toString(), cause)
+    constructor() : this(null, null)
+}
+
 /**
  * Gets a party for the existing account known by that name. If the account is local and has no key, then a new key
  * is created.

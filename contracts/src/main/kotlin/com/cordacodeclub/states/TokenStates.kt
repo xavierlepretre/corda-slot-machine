@@ -35,7 +35,7 @@ class LockableTokenState private constructor(
 
     constructor(bettor: Bettor) : this(bettor.holder, bettor.issuedAmount.issuer, bettor.issuedAmount.amount)
 
-    fun plus(other: LockableTokenState): LockableTokenState {
+    operator fun plus(other: LockableTokenState): LockableTokenState {
         require(isLocked == other.isLocked) { "Both locked statuses must be equal" }
         require(issuer == other.issuer) { "Both issuers must be equal" }
         require(holder == other.holder) { "If unlocked both holders must be equal" }
