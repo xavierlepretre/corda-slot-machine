@@ -58,6 +58,38 @@
         </div>
     </div>
 
+    <template id="leaderboard_entry">
+        <tr>
+            <td class="when"></td>
+            <td class="who"></td>
+            <td class="score"></td>
+            <td class="linearId" style="display:none;"></td>
+        </tr>
+    </template>
+
+    <div class="leaderboard_container">
+        <div class="actions">
+            <label for="entry_nickname">Your nickname</label>
+            <input id="entry_nickname" name="entry_nickname" placeholder="YourNickname" alt="Alphanumeric only" type="text"/>
+            <button id="enter_leaderboard">Enter Leaderboard</button>
+            <br/>
+            <button id="load_leaderboard">Load Leaderboard</button>
+        </div>
+        <table id="leaderboard_table">
+            <thead>
+                <tr>
+                    <th>When</th>
+                    <th>Who</th>
+                    <th>Score</th>
+                    <th style="display: none;">Linear Id</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard_content">
+
+            </tbody>
+        </table>
+    </div>
+
     <div id="loginDialog" title="Login dialog" style="font-size: 1em">
         <p>Welcome!
             This is a slot machine UI, with Corda game logic, and players&rsquo; tokens in separate Corda accounts.
@@ -96,6 +128,7 @@
     <script type="text/javascript" src="js/setup.js"></script>
     <script type="text/javascript" src="js/js.cookie.min.js"></script>
     <script type="text/javascript" src="js/login.js"></script>
+    <script type="text/javascript" src="js/leaderboard.js"></script>
     <script type="text/javascript" src="js/slots.js"></script>
 </body>
 

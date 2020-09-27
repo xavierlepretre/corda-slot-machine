@@ -16,6 +16,7 @@ import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.node.services.Vault
 import net.corda.core.node.services.vault.*
+import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
@@ -25,6 +26,7 @@ object LeaderboardFlows {
 
     const val maxLeaderboardLength = 20
 
+    @CordaSerializable
     data class LeaderboardNamedEntryState(
             val state: StateAndRef<LeaderboardEntryState>,
             val nickname: String)
@@ -35,9 +37,14 @@ object LeaderboardFlows {
         class SimpleInitiator(private val playerAccountName: String,
                               private val playerNickname: String,
                               private val tokenIssuer: AbstractParty,
-                              private val observers: List<Party> = listOf(),
-                              override val progressTracker: ProgressTracker = Initiator.tracker())
+                              private val observers: List<Party>,
+                              override val progressTracker: ProgressTracker)
             : FlowLogic<SignedTransaction>() {
+
+            constructor(playerAccountName: String,
+                        playerNickname: String,
+                        tokenIssuer: AbstractParty)
+                    : this(playerAccountName, playerNickname, tokenIssuer, listOf(), tracker())
 
             companion object {
                 object ResolvingPlayer : ProgressTracker.Step("Resolving player.")
@@ -69,8 +76,12 @@ object LeaderboardFlows {
         class Initiator(private val player: AbstractParty,
                         private val playerNickname: String,
                         private val tokenIssuer: AbstractParty,
-                        private val observers: List<Party> = listOf(),
-                        override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
+                        private val observers: List<Party>,
+                        override val progressTracker: ProgressTracker) : FlowLogic<SignedTransaction>() {
+
+            constructor(player: AbstractParty,
+                        playerNickname: String,
+                        tokenIssuer: AbstractParty) : this(player, playerNickname, tokenIssuer, listOf(), tracker())
 
             companion object {
                 object FetchingTokens : ProgressTracker.Step("Fetching tokens.")
@@ -208,8 +219,10 @@ object LeaderboardFlows {
     object Fetch {
         @StartableByRPC
         class Local(private val tokenIssuer: AbstractParty,
-                    override val progressTracker: ProgressTracker = tracker())
+                    override val progressTracker: ProgressTracker)
             : FlowLogic<List<LeaderboardNamedEntryState>>() {
+
+            constructor(tokenIssuer: AbstractParty) : this(tokenIssuer, tracker())
 
             companion object {
                 object PreparingCriteria : ProgressTracker.Step("Preparing criteria.")

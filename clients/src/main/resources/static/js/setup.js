@@ -233,7 +233,7 @@
       ajaxRequest({ name: accountName }, "GET", "/balance", fnSuccess, fnError);
     }
 
-    return { spin, create, balance };
+    return { ajaxRequest, spin, create, balance };
   }
   window.ioServer = ioServer();
 })();

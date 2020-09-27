@@ -102,3 +102,13 @@ a img { border: none; }
 	width: 30px; height: 30px; float: left; margin: 0 5px;
 	background-repeat: no-repeat;
 }
+
+/*---------*/
+
+table#leaderboard_table {
+    border: 1px solid black;
+}
+
+table#leaderboard_table th, table#leaderboard_table td {
+    border: 1px solid black;
+}
