@@ -4,6 +4,7 @@ import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.LeaderboardEntryContract
 import com.cordacodeclub.flows.LockableTokenFlows.Information
 import com.cordacodeclub.schema.LeaderboardEntrySchemaV1
+import com.cordacodeclub.services.leaderboardNicknamesDatabaseService
 import com.cordacodeclub.states.LeaderboardEntryState
 import com.cordacodeclub.states.LockableTokenState
 import net.corda.core.contracts.ReferencedStateAndRef
@@ -24,10 +25,15 @@ object LeaderboardFlows {
 
     const val maxLeaderboardLength = 20
 
+    data class LeaderboardNamedEntryState(
+            val state: StateAndRef<LeaderboardEntryState>,
+            val nickname: String)
+
     object Create {
 
         @StartableByRPC
         class SimpleInitiator(private val playerAccountName: String,
+                              private val playerNickname: String,
                               private val tokenIssuer: AbstractParty,
                               private val observers: List<Party> = listOf(),
                               override val progressTracker: ProgressTracker = Initiator.tracker())
@@ -51,6 +57,7 @@ object LeaderboardFlows {
 
                 progressTracker.currentStep = PassingOnToInitiator
                 return subFlow(Initiator(player = player,
+                        playerNickname = playerNickname,
                         tokenIssuer = tokenIssuer,
                         observers = observers,
                         progressTracker = PassingOnToInitiator.childProgressTracker()))
@@ -60,6 +67,7 @@ object LeaderboardFlows {
         @InitiatingFlow
         @StartableByRPC
         class Initiator(private val player: AbstractParty,
+                        private val playerNickname: String,
                         private val tokenIssuer: AbstractParty,
                         private val observers: List<Party> = listOf(),
                         override val progressTracker: ProgressTracker = tracker()) : FlowLogic<SignedTransaction>() {
@@ -69,18 +77,23 @@ object LeaderboardFlows {
                 object FetchingCurrentLeaderboard : ProgressTracker.Step("Fetching current leaderboard.")
                 object GeneratingTransaction : ProgressTracker.Step("Generating transaction.")
                 object VerifyingTransaction : ProgressTracker.Step("Verifying transaction.")
+                object AddingNickname : ProgressTracker.Step("Adding player nickname.")
                 object SigningTransaction : ProgressTracker.Step("Signing transaction.")
                 object FinalisingTransaction : ProgressTracker.Step("Finalising transaction.") {
                     override fun childProgressTracker() = FinalityFlow.tracker()
                 }
+
+                object RemovingNicknames : ProgressTracker.Step("Removing nicknames.")
 
                 fun tracker() = ProgressTracker(
                         FetchingTokens,
                         FetchingCurrentLeaderboard,
                         GeneratingTransaction,
                         VerifyingTransaction,
+                        AddingNickname,
                         SigningTransaction,
-                        FinalisingTransaction)
+                        FinalisingTransaction,
+                        RemovingNicknames)
             }
 
             @Suspendable
@@ -93,6 +106,7 @@ object LeaderboardFlows {
 
                 progressTracker.currentStep = FetchingCurrentLeaderboard
                 val leaderboard = subFlow(Fetch.Local(tokenIssuer))
+                        .map { it.state }
                 val entriesToKeep = leaderboard.take(maxLeaderboardLength)
                 val entriesToRetire = leaderboard.drop(maxLeaderboardLength)
                 val entryToOvertake =
@@ -110,6 +124,7 @@ object LeaderboardFlows {
                         .singleOrNull()
                         ?: throw FlowException("Tokens are not controlled by a single notary")
                 val now = Instant.now()
+                val newId = UniqueIdentifier()
                 val participants = observers.plus(player).distinct()
                 val builder = TransactionBuilder(notary)
                 if (entryToOvertake == null) {
@@ -118,8 +133,7 @@ object LeaderboardFlows {
                     builder.addCommand(LeaderboardEntryContract.Commands.Overtake(0, 0), player.owningKey)
                             .addInputState(entryToOvertake)
                 }
-                builder.addOutputState(LeaderboardEntryState(player, playerTotal,
-                        tokenIssuer, now, UniqueIdentifier(), participants))
+                builder.addOutputState(LeaderboardEntryState(player, playerTotal, tokenIssuer, now, newId, participants))
                 entriesToRetire.forEach {
                     builder.addCommand(
                             LeaderboardEntryContract.Commands.Retire(builder.inputStates().size),
@@ -135,6 +149,13 @@ object LeaderboardFlows {
                 progressTracker.currentStep = VerifyingTransaction
                 builder.verify(serviceHub)
 
+                progressTracker.currentStep = AddingNickname
+                try {
+                    serviceHub.leaderboardNicknamesDatabaseService.addLeaderboardNickname(newId.id, playerNickname)
+                } catch (e: RuntimeException) {
+                    throw FlowException(e)
+                }
+
                 progressTracker.currentStep = SigningTransaction
                 val signed = serviceHub.signInitialTransaction(builder, player.owningKey)
 
@@ -145,7 +166,19 @@ object LeaderboardFlows {
                 val observerSessions = observerHosts.map(this@Initiator::initiateFlow)
 
                 progressTracker.currentStep = FinalisingTransaction
-                return subFlow(FinalityFlow(signed, observerSessions, FinalisingTransaction.childProgressTracker()))
+                val finalised = subFlow(FinalityFlow(signed, observerSessions, FinalisingTransaction.childProgressTracker()))
+
+                progressTracker.currentStep = RemovingNicknames
+                entriesToRetire.plus(entryToOvertake)
+                        .filterNotNull()
+                        .onEach {
+                            try {
+                                serviceHub.leaderboardNicknamesDatabaseService.deleteNickname(it.state.data.linearId.id)
+                            } catch (e: RuntimeException) {
+                                // Swallow it
+                            }
+                        }
+                return finalised
             }
         }
 
@@ -176,21 +209,23 @@ object LeaderboardFlows {
         @StartableByRPC
         class Local(private val tokenIssuer: AbstractParty,
                     override val progressTracker: ProgressTracker = tracker())
-            : FlowLogic<List<StateAndRef<LeaderboardEntryState>>>() {
+            : FlowLogic<List<LeaderboardNamedEntryState>>() {
 
             companion object {
                 object PreparingCriteria : ProgressTracker.Step("Preparing criteria.")
                 object QueryingVault : ProgressTracker.Step("Querying vault.")
+                object AssigningNames : ProgressTracker.Step("Assigning names to entries.")
                 object ReturningResult : ProgressTracker.Step("Returning result.")
 
                 fun tracker() = ProgressTracker(
                         PreparingCriteria,
                         QueryingVault,
+                        AssigningNames,
                         ReturningResult)
             }
 
             @Suspendable
-            override fun call(): List<StateAndRef<LeaderboardEntryState>> {
+            override fun call(): List<LeaderboardNamedEntryState> {
                 progressTracker.currentStep = PreparingCriteria
                 val criteria = QueryCriteria.VaultQueryCriteria(
                         contractStateTypes = setOf(LeaderboardEntryState::class.java),
@@ -226,8 +261,17 @@ object LeaderboardFlows {
                     pageNumber++
                 } while (pageSpec.pageSize * (pageNumber - 1) <= results.totalStatesAvailable)
 
+                progressTracker.currentStep = AssigningNames
+                val namedEntries = fetched.map {
+                    LeaderboardNamedEntryState(it, try {
+                        serviceHub.leaderboardNicknamesDatabaseService.getNickname(it.state.data.linearId.id)
+                    } catch (e: RuntimeException) {
+                        "unnamed"
+                    })
+                }
+
                 progressTracker.currentStep = ReturningResult
-                return fetched
+                return namedEntries
             }
         }
     }

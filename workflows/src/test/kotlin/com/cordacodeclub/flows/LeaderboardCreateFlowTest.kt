@@ -1,5 +1,6 @@
 package com.cordacodeclub.flows
 
+import com.cordacodeclub.flows.LeaderboardFlows.LeaderboardNamedEntryState
 import com.cordacodeclub.states.LeaderboardEntryState
 import com.cordacodeclub.states.LockableTokenState
 import com.cordacodeclub.states.LockableTokenType
@@ -23,7 +24,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class LeaderboardCreateFlowTest {
     private lateinit var network: MockNetwork
@@ -98,16 +98,14 @@ class LeaderboardCreateFlowTest {
                 .outRefsOfType()
     }
 
-    private fun createEntry(playerNode: StartedMockNode, player: AbstractParty) = createEntryRef(playerNode, player)
-            .state.data
-
-    private fun createEntryRef(playerNode: StartedMockNode, player: AbstractParty) = playerNode
-            .startFlow(LeaderboardFlows.Create.Initiator(player, issuer))
+    private fun createEntry(playerNode: StartedMockNode, player: AbstractParty, nickname: String) = playerNode
+            .startFlow(LeaderboardFlows.Create.Initiator(player, nickname, issuer))
             .also { network.runNetwork() }
             .get()
             .tx
             .outRefsOfType<LeaderboardEntryState>()
             .single()
+            .let { LeaderboardNamedEntryState(it, nickname) }
 
     private fun fetchEntryRefs(playerNode: StartedMockNode) = playerNode
             .startFlow(LeaderboardFlows.Fetch.Local(issuer))
@@ -117,7 +115,7 @@ class LeaderboardCreateFlowTest {
     @Test
     fun `can create leaderboard entry`() {
         issueToken(issuerNode, player1, issuer, 100L)
-        val createTx = playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, issuer))
+        val createTx = playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, "nickname1", issuer))
                 .also { network.runNetwork() }
                 .get()
         val created = createTx.tx.outputsOfType<LeaderboardEntryState>().single()
@@ -129,14 +127,14 @@ class LeaderboardCreateFlowTest {
     @Test
     fun `can create 3 leaderboard entries`() {
         issueToken(issuerNode, player1, issuer, 100L)
-        val created1 = createEntry(playerNode, player1)
+        val created1 = createEntry(playerNode, player1, "nickname1").state.state.data
         issueToken(issuerNode, player2, issuer, 110L)
-        val created2 = createEntry(playerNode, player2)
+        val created2 = createEntry(playerNode, player2, "nickname2").state.state.data
         assertEquals(player2, created2.player)
         assertEquals(issuer, created2.tokenIssuer)
         assertEquals(Amount(110L, LockableTokenType), created2.total)
         issueToken(issuerNode, player1, issuer, 20L)
-        val created3 = createEntry(playerNode, player1)
+        val created3 = createEntry(playerNode, player1, "nickname1").state.state.data
         assertEquals(player1, created3.player)
         assertEquals(issuer, created3.tokenIssuer)
         assertEquals(Amount(120L, LockableTokenType), created3.total)
@@ -145,11 +143,11 @@ class LeaderboardCreateFlowTest {
     @Test
     fun `cannot create somewhat duplicate leaderboard entries`() {
         issueToken(issuerNode, player1, issuer, 100L)
-        playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, issuer))
+        playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, "nickname1", issuer))
                 .also { network.runNetwork() }
                 .get()
         val error = assertThrows<FlowException> {
-            playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, issuer))
+            playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, "nickname1", issuer))
                     .also { network.runNetwork() }
                     .getOrThrow()
         }
@@ -159,9 +157,9 @@ class LeaderboardCreateFlowTest {
     @Test
     fun `can create same leaderboard entry total if different player`() {
         issueToken(issuerNode, player1, issuer, 100L)
-        val created1 = createEntryRef(playerNode, player1)
+        val created1 = createEntry(playerNode, player1, "nickname1")
         issueToken(issuerNode, player2, issuer, 100L)
-        val created2 = createEntryRef(playerNode, player2)
+        val created2 = createEntry(playerNode, player2, "nickname2")
         val fetched = fetchEntryRefs(playerNode)
 
         assertEquals(listOf(created1, created2), fetched)
@@ -171,27 +169,32 @@ class LeaderboardCreateFlowTest {
     fun `can create 20 leaderboard entries of same player`() {
         val created = (1..LeaderboardFlows.maxLeaderboardLength).map {
             issueToken(issuerNode, player1, issuer, 10L)
-            createEntryRef(playerNode, player1)
+            createEntry(playerNode, player1, "nickname1")
         }
         val fetched = fetchEntryRefs(playerNode)
 
-        assertEquals(created.sortedByDescending { it.state.data.total }, fetched)
+        assertEquals(created.sortedByDescending { it.state.state.data.total }, fetched)
     }
 
     @Test
     fun `can create 21 leaderboard entries of same player and keep 20`() {
         val created = (1..LeaderboardFlows.maxLeaderboardLength).map {
             issueToken(issuerNode, player1, issuer, 10L)
-            createEntryRef(playerNode, player1)
+            createEntry(playerNode, player1, "nickname1")
         }
         issueToken(issuerNode, player1, issuer, 10L)
-        val createTx = playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, issuer))
+        val createTx = playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, "nickname1", issuer))
                 .also { network.runNetwork() }
                 .get()
-        assertEquals(created.first(), playerNode.services.toStateAndRef(createTx.tx.inputs.first()))
+        assertEquals(created.first().state, playerNode.services.toStateAndRef(createTx.tx.inputs.first()))
         val fetched = fetchEntryRefs(playerNode)
         assertEquals(
-                created.drop(1).plus(createTx.tx.outRefsOfType()).sortedByDescending { it.state.data.total },
+                created
+                        .drop(1)
+                        .plus(LeaderboardNamedEntryState(
+                                createTx.tx.outRefsOfType<LeaderboardEntryState>().single(),
+                                "nickname1"))
+                        .sortedByDescending { it.state.state.data.total },
                 fetched)
     }
 
@@ -199,22 +202,22 @@ class LeaderboardCreateFlowTest {
     fun `can create 21 leaderboard entries of different players and keep 20`() {
         val created = (1..(LeaderboardFlows.maxLeaderboardLength / 2)).flatMap {
             issueToken(issuerNode, player1, issuer, 10L)
-            val first = createEntryRef(playerNode, player1)
+            val first = createEntry(playerNode, player1, "nickname1")
             issueToken(issuerNode, player2, issuer, 10L)
-            val second = createEntryRef(playerNode, player2)
+            val second = createEntry(playerNode, player2, "nickname2")
             listOf(first, second)
         }
         issueToken(issuerNode, player1, issuer, 10L)
-        val createTx = playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, issuer))
+        val createTx = playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, "nickname1", issuer))
                 .also { network.runNetwork() }
                 .get()
         // When overtaking, with entries that have the same total, it is the newest one that is picked.
-        assertEquals(created[1], playerNode.services.toStateAndRef(createTx.tx.inputs.first()))
+        assertEquals(created[1].state, playerNode.services.toStateAndRef(createTx.tx.inputs.first()))
         val fetched = fetchEntryRefs(playerNode)
         val expected = created.drop(2)
                 .plus(created.first())
-                .plus(createTx.tx.outRefsOfType())
-                .sortedByDescending { it.state.data.total }
+                .plus(LeaderboardNamedEntryState(createTx.tx.outRefsOfType<LeaderboardEntryState>().single(), "nickname1"))
+                .sortedByDescending { it.state.state.data.total }
         assertEquals(expected, fetched)
     }
 
@@ -222,14 +225,14 @@ class LeaderboardCreateFlowTest {
     fun `cannot create leaderboard entry if do not qualify`() {
         val created = (1..(LeaderboardFlows.maxLeaderboardLength / 2)).flatMap {
             issueToken(issuerNode, player1, issuer, 10L)
-            val first = createEntryRef(playerNode, player1)
+            val first = createEntry(playerNode, player1, "nickname1")
             issueToken(issuerNode, player2, issuer, 10L)
-            val second = createEntryRef(playerNode, player2)
+            val second = createEntry(playerNode, player2, "nickname2")
             listOf(first, second)
         }
         issueToken(issuerNode, player3, issuer, 10L)
         val error = assertThrows<FlowException> {
-            playerNode.startFlow(LeaderboardFlows.Create.Initiator(player3, issuer))
+            playerNode.startFlow(LeaderboardFlows.Create.Initiator(player3, "nick3", issuer))
                     .also { network.runNetwork() }
                     .getOrThrow()
         }

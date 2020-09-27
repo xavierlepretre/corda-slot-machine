@@ -4,7 +4,6 @@ import com.cordacodeclub.flows.*
 import com.cordacodeclub.flows.LockableTokenFlows.Fetch.NotEnoughTokensException
 import com.cordacodeclub.states.LeaderboardEntryState
 import net.corda.core.identity.CordaX500Name
-import net.corda.core.identity.Party
 import net.corda.core.messaging.startFlow
 import net.corda.core.utilities.getOrThrow
 import org.slf4j.LoggerFactory
@@ -102,12 +101,16 @@ class Controller(rpc: NodeRPCConnection) {
     @PostMapping(value = ["/enterLeaderboard"], produces = ["application/json"])
     private fun enterLeaderboard(request: HttpServletRequest): ResponseEntity<Any> {
         val name = request.getParameter("name")
+        val nickname = request.getParameter("nickname")
         return try {
             val createTx = proxy.startFlow(LeaderboardFlows.Create::SimpleInitiator,
-                    name, casino, listOf<Party>(), LeaderboardFlows.Create.SimpleInitiator.tracker())
+                    name, nickname, casino, listOf(), LeaderboardFlows.Create.SimpleInitiator.tracker())
                     .returnValue.getOrThrow()
             val entry = createTx.tx.outputsOfType<LeaderboardEntryState>().single()
             ResponseEntity.ok(LeaderboardEntryResult())
+        } catch (error: NullPointerException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("name or nickname not found")
         } catch (error: AccountNotFoundException) {
             ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Account not found, you may want to reset")
@@ -124,9 +127,7 @@ class Controller(rpc: NodeRPCConnection) {
             val leaderboardEntries = proxy.startFlow(LeaderboardFlows.Fetch::Local,
                     casino, LeaderboardFlows.Fetch.Local.tracker())
                     .returnValue.getOrThrow()
-                    .map { it.state.data }
-                    .map { LeaderboardEntry(it.total.quantity, it.creationDate.toString(), it.linearId.id.toString()) }
-            ResponseEntity.ok(Leaderboard(leaderboardEntries))
+            ResponseEntity.ok(Leaderboard.fromNamedEntries(leaderboardEntries))
         } catch (error: Exception) {
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed $error")

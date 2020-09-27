@@ -1,6 +1,7 @@
 package com.cordacodeclub.webserver
 
 import com.cordacodeclub.flows.GameResult
+import com.cordacodeclub.flows.LeaderboardFlows
 
 // don't change the name or types of the elements of this class
 // they are as expected by the client-side JavaScript
@@ -46,8 +47,20 @@ data class LeaderboardEntryResult(
 
 // Do not add the player's account name as at the moment we count on it to be like a password.
 data class LeaderboardEntry(
+        val nickname: String,
         val total: Long,
         val creationDate: String,
-        val linearId: String)
+        val linearId: String) {
+    constructor(entry: LeaderboardFlows.LeaderboardNamedEntryState)
+            : this(entry.nickname,
+            entry.state.state.data.total.quantity,
+            entry.state.state.data.creationDate.toString(),
+            entry.state.state.data.linearId.id.toString())
+}
 
-data class Leaderboard(val entries: List<LeaderboardEntry>)
+data class Leaderboard(val entries: List<LeaderboardEntry>) {
+    companion object {
+        fun fromNamedEntries(entries: List<LeaderboardFlows.LeaderboardNamedEntryState>) = entries
+                .map(::LeaderboardEntry)
+    }
+}

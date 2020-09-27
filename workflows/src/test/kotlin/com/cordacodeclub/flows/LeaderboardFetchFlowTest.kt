@@ -1,5 +1,6 @@
 package com.cordacodeclub.flows
 
+import com.cordacodeclub.flows.LeaderboardFlows.LeaderboardNamedEntryState
 import com.cordacodeclub.states.LeaderboardEntryState
 import com.cordacodeclub.states.LockableTokenState
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount
@@ -91,13 +92,14 @@ class LeaderboardFetchFlowTest {
                 .outRefsOfType()
     }
 
-    private fun createEntry(playerNode: StartedMockNode, player: AbstractParty) = playerNode
-            .startFlow(LeaderboardFlows.Create.Initiator(player, issuer))
+    private fun createEntry(playerNode: StartedMockNode, player: AbstractParty, nickname: String) = playerNode
+            .startFlow(LeaderboardFlows.Create.Initiator(player, nickname, issuer))
             .also { network.runNetwork() }
             .get()
             .tx
             .outRefsOfType<LeaderboardEntryState>()
             .single()
+            .let { LeaderboardNamedEntryState(it, nickname) }
 
     @Test
     fun `empty leaderboard returns empty`() {
@@ -110,7 +112,7 @@ class LeaderboardFetchFlowTest {
     @Test
     fun `leaderboard with 1 entry returns it`() {
         issueToken(issuerNode, player1, issuer, 100L)
-        val entry1 = createEntry(playerNode, player1)
+        val entry1 = createEntry(playerNode, player1, "nickname1")
         val fetched = playerNode.startFlow(LeaderboardFlows.Fetch.Local(issuer))
                 .also { network.runNetwork() }
                 .get()
@@ -121,12 +123,12 @@ class LeaderboardFetchFlowTest {
     @Test
     fun `leaderboard with 3 entries returns them sorted`() {
         val token1 = issueToken(issuerNode, player1, issuer, 100L)
-        val entry1 = createEntry(playerNode, player1)
+        val entry1 = createEntry(playerNode, player1, "nickname1")
         val token2 = issueToken(issuerNode, player1, issuer, 50L)
         assertEquals(token1.state.notary, token2.state.notary)
-        val entry2 = createEntry(playerNode, player1)
+        val entry2 = createEntry(playerNode, player1, "nickname1")
         issueToken(issuerNode, player2, issuer, 125L)
-        val entry3 = createEntry(playerNode, player2)
+        val entry3 = createEntry(playerNode, player2, "nickname2")
         val fetched = playerNode.startFlow(LeaderboardFlows.Fetch.Local(issuer))
                 .also { network.runNetwork() }
                 .get()
