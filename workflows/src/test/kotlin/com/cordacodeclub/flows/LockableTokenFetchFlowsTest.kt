@@ -41,8 +41,6 @@ class LockableTokenFetchFlowsTest {
         issuerNode = network.createPartyNode()
         issuerNodeParty = issuerNode.info.legalIdentities.first()
         holderNode = network.createPartyNode()
-        // For real nodes this happens automatically, but we have to manually register the flow for tests.
-//        listOf(issuerNode, holderNode).forEach { it.registerInitiatedFlow(ExampleFlow.Acceptor::class.java) }
         network.runNetwork()
         prepareIssuerAndHolders()
     }

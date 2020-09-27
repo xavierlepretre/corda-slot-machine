@@ -355,7 +355,7 @@ object LockableTokenFlows {
                 val fetched = mutableListOf<StateAndRef<LockableTokenState>>()
                 do {
                     val pageSpec = PageSpecification(pageNumber = pageNumber, pageSize = PAGE_SIZE_DEFAULT)
-                    val results: Vault.Page<LockableTokenState> = serviceHub.vaultService.queryBy(
+                    val results = serviceHub.vaultService.queryBy(
                             LockableTokenState::class.java, criteria, pageSpec)
                     for (state in results.states) {
                         // TODO confirm that this should never happen. Worried about ByteArray's length.
@@ -456,6 +456,89 @@ object LockableTokenFlows {
                     pageNumber++
                 } while ((pageSpec.pageSize * (pageNumber - 1)) <= results.totalStatesAvailable)
                 return balanceSoFar
+            }
+        }
+    }
+
+    object Information {
+
+        /**
+         * Fetches all the tokens issued by issuer and held by the holder known by its account name.
+         */
+        @StartableByRPC
+        class SimpleLocal(private val holderName: String,
+                          private val issuer: AbstractParty,
+                          override val progressTracker: ProgressTracker) : FlowLogic<List<StateAndRef<LockableTokenState>>>() {
+
+            constructor(holderName: String, issuer: AbstractParty) : this(holderName, issuer, tracker())
+
+            companion object {
+                object ResolvingHolder : ProgressTracker.Step("Resolving holder.")
+                object PassingOnToLocal : ProgressTracker.Step("Passing on to local.") {
+                    override fun childProgressTracker() = Local.tracker()
+                }
+
+                fun tracker() = ProgressTracker(ResolvingHolder, PassingOnToLocal)
+            }
+
+            @Suspendable
+            override fun call(): List<StateAndRef<LockableTokenState>> {
+                progressTracker.currentStep = ResolvingHolder
+                val holder = getParty(holderName)
+
+                progressTracker.currentStep = PassingOnToLocal
+                return subFlow(Local(holder, issuer, PassingOnToLocal.childProgressTracker()))
+            }
+        }
+
+        /**
+         * Fetches the current balance of tokens issued by issuer and held by the holder.
+         */
+        @StartableByRPC
+        class Local(private val holder: AbstractParty,
+                    private val issuer: AbstractParty,
+                    override val progressTracker: ProgressTracker) : FlowLogic<List<StateAndRef<LockableTokenState>>>() {
+
+            constructor(holder: AbstractParty, issuer: AbstractParty) : this(holder, issuer, tracker())
+
+            companion object {
+                object PreparingCriteria : ProgressTracker.Step("Preparing criteria.")
+                object QueryingVault : ProgressTracker.Step("Querying vault.")
+
+                fun tracker() = ProgressTracker(PreparingCriteria, QueryingVault)
+            }
+
+            @Suspendable
+            override fun call(): List<StateAndRef<LockableTokenState>> {
+                progressTracker.currentStep = PreparingCriteria
+                val criteria = QueryCriteria.VaultQueryCriteria(
+                        contractStateTypes = setOf(LockableTokenState::class.java),
+                        relevancyStatus = Vault.RelevancyStatus.RELEVANT,
+                        status = Vault.StateStatus.UNCONSUMED
+                ).and(QueryCriteria.VaultCustomQueryCriteria(builder {
+                    LockableTokenSchemaV1.PersistentLockableToken::issuer.equal(issuer.owningKey.encoded)
+                })
+                ).and(QueryCriteria.VaultCustomQueryCriteria(builder {
+                    LockableTokenSchemaV1.PersistentLockableToken::holder.equal(holder.owningKey.encoded)
+                }))
+
+                progressTracker.currentStep = QueryingVault
+                var pageNumber = DEFAULT_PAGE_NUM
+                val fetched = mutableListOf<StateAndRef<LockableTokenState>>()
+                do {
+                    val pageSpec = PageSpecification(pageNumber = pageNumber, pageSize = Fetch.PAGE_SIZE_DEFAULT)
+                    val results: Vault.Page<LockableTokenState> = serviceHub.vaultService.queryBy(
+                            LockableTokenState::class.java, criteria, pageSpec)
+                    fetched += results.states
+                    for (state in results.states) {
+                        // TODO confirm that this should never happen. Worried about ByteArray's length.
+                        // https://github.com/xavierlepretre/corda-slot-machine/issues/23
+                        if (state.state.data.let { it.holder != holder || it.issuer != issuer })
+                            throw FlowException("The query returned a state that had wrong holder or issuer")
+                    }
+                    pageNumber++
+                } while ((pageSpec.pageSize * (pageNumber - 1)) <= results.totalStatesAvailable)
+                return fetched
             }
         }
     }

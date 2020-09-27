@@ -1,10 +1,8 @@
 package com.cordacodeclub.webserver
 
-import com.cordacodeclub.flows.AccountNotFoundException
-import com.cordacodeclub.flows.GameFlows
-import com.cordacodeclub.flows.LockableTokenFlows
+import com.cordacodeclub.flows.*
 import com.cordacodeclub.flows.LockableTokenFlows.Fetch.NotEnoughTokensException
-import com.cordacodeclub.flows.UserAccountFlows
+import com.cordacodeclub.states.LeaderboardEntryState
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.messaging.startFlow
 import net.corda.core.utilities.getOrThrow
@@ -35,6 +33,7 @@ class Controller(rpc: NodeRPCConnection) {
     private val casino = proxy.wellKnownPartyFromX500Name(TODO_casino_x500)
             ?: throw RuntimeException("Casino not found")
 
+    @Suppress("unused")
     @PostMapping(value = ["/create"], produces = ["text/plain"])
     private fun create(request: HttpServletRequest): ResponseEntity<String> {
         val name = request.getParameter("name")
@@ -57,6 +56,7 @@ class Controller(rpc: NodeRPCConnection) {
         }
     }
 
+    @Suppress("unused")
     @GetMapping(value = ["/balance"], produces = ["text/plain"])
     private fun balance(@RequestParam(value = "name") name: String): ResponseEntity<String> {
         return try {
@@ -72,6 +72,7 @@ class Controller(rpc: NodeRPCConnection) {
         }
     }
 
+    @Suppress("unused")
     @PostMapping(value = ["/spin"], produces = ["application/json"])
     private fun spin(request: HttpServletRequest): ResponseEntity<Any> {
         val name = request.getParameter("name")
@@ -96,19 +97,89 @@ class Controller(rpc: NodeRPCConnection) {
         }
     }
 
+    @Suppress("unused")
+    @PostMapping(value = ["/enterLeaderboard"], produces = ["application/json"])
+    private fun enterLeaderboard(request: HttpServletRequest): ResponseEntity<Any> {
+        val name = request.getParameter("name")
+        val nickname = request.getParameter("nickname")
+        return try {
+            val createTx = proxy.startFlow(LeaderboardFlows.Create::SimpleInitiator,
+                    name, nickname, casino)
+                    .returnValue.getOrThrow()
+            val entry = createTx.tx.outputsOfType<LeaderboardEntryState>().single()
+            ResponseEntity.ok(LeaderboardEntryResult())
+        } catch (error: NullPointerException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("name or nickname not found")
+        } catch (error: AccountNotFoundException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Account not found, you may want to reset")
+        } catch (error: NoTokensForLeaderboardException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(error.message)
+        } catch (error: ScoreTooLowForLeaderboardException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(error.message)
+        } catch (error: Exception) {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed $error")
+        }
+    }
+
+    @Suppress("unused")
+    // I wanted to use Delete but it getParameter to null
+    @PostMapping(value = ["/leaveLeaderboard"], produces = ["application/json"])
+    private fun leaveLeaderboard(request: HttpServletRequest): ResponseEntity<Any> {
+        val name = request.getParameter("name")!!
+        return try {
+            proxy.startFlow(LeaderboardFlows.Retire::SimpleInitiator, name)
+                    .returnValue.getOrThrow()
+            ResponseEntity.ok(LeaderboardLeaveResult())
+        } catch (error: NullPointerException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("name not found")
+        } catch (error: AccountNotFoundException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Account not found, you may want to reset")
+        } catch (error: NothingToRetireFromLeaderboardException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(error.message)
+        } catch (error: Exception) {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed $error")
+        }
+    }
+
+    @Suppress("unused")
+    @GetMapping(value = ["/leaderboard"], produces = ["application/json"])
+    private fun getLeaderboard(@Suppress("UNUSED_PARAMETER") request: HttpServletRequest): ResponseEntity<Any> {
+        return try {
+            val leaderboardEntries = proxy.startFlow(LeaderboardFlows.Fetch::Local,
+                    casino)
+                    .returnValue.getOrThrow()
+            ResponseEntity.ok(Leaderboard.fromNamedEntries(leaderboardEntries))
+        } catch (error: Exception) {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed $error")
+        }
+    }
+
     // the following are just for testing, not used in production
 
+    @Suppress("unused")
     @GetMapping(value = ["/test"], produces = ["text/plain"])
     private fun test(): String {
         return "Test OK"
     }
 
+    @Suppress("unused")
     @PostMapping(value = ["/echo"], produces = ["text/plain"])
     private fun echo(request: HttpServletRequest): ResponseEntity<String> {
         val payload = request.getParameter("payload")
         return ResponseEntity.ok("Echo $payload")
     }
 
+    @Suppress("unused")
     @PostMapping(value = ["/payout"], produces = ["text/plain"])
     private fun spinPayout(request: HttpServletRequest): ResponseEntity<String> {
         val name = request.getParameter("name")
