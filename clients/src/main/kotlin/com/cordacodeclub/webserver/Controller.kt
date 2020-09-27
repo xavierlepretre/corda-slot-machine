@@ -34,6 +34,7 @@ class Controller(rpc: NodeRPCConnection) {
     private val casino = proxy.wellKnownPartyFromX500Name(TODO_casino_x500)
             ?: throw RuntimeException("Casino not found")
 
+    @Suppress("unused")
     @PostMapping(value = ["/create"], produces = ["text/plain"])
     private fun create(request: HttpServletRequest): ResponseEntity<String> {
         val name = request.getParameter("name")
@@ -56,6 +57,7 @@ class Controller(rpc: NodeRPCConnection) {
         }
     }
 
+    @Suppress("unused")
     @GetMapping(value = ["/balance"], produces = ["text/plain"])
     private fun balance(@RequestParam(value = "name") name: String): ResponseEntity<String> {
         return try {
@@ -71,6 +73,7 @@ class Controller(rpc: NodeRPCConnection) {
         }
     }
 
+    @Suppress("unused")
     @PostMapping(value = ["/spin"], produces = ["application/json"])
     private fun spin(request: HttpServletRequest): ResponseEntity<Any> {
         val name = request.getParameter("name")
@@ -95,6 +98,7 @@ class Controller(rpc: NodeRPCConnection) {
         }
     }
 
+    @Suppress("unused")
     @PostMapping(value = ["/enterLeaderboard"], produces = ["application/json"])
     private fun enterLeaderboard(request: HttpServletRequest): ResponseEntity<Any> {
         val name = request.getParameter("name")
@@ -113,11 +117,12 @@ class Controller(rpc: NodeRPCConnection) {
         }
     }
 
+    @Suppress("unused")
     @GetMapping(value = ["/leaderboard"], produces = ["application/json"])
-    private fun getLeaderboard(request: HttpServletRequest): ResponseEntity<Any> {
+    private fun getLeaderboard(@Suppress("UNUSED_PARAMETER") request: HttpServletRequest): ResponseEntity<Any> {
         return try {
             val leaderboardEntries = proxy.startFlow(LeaderboardFlows.Fetch::Local,
-                    casino, LeaderboardFlows.Create.SimpleInitiator.tracker())
+                    casino, LeaderboardFlows.Fetch.Local.tracker())
                     .returnValue.getOrThrow()
                     .map { it.state.data }
                     .map { LeaderboardEntry(it.total.quantity, it.creationDate.toString(), it.linearId.id.toString()) }
@@ -130,17 +135,20 @@ class Controller(rpc: NodeRPCConnection) {
 
     // the following are just for testing, not used in production
 
+    @Suppress("unused")
     @GetMapping(value = ["/test"], produces = ["text/plain"])
     private fun test(): String {
         return "Test OK"
     }
 
+    @Suppress("unused")
     @PostMapping(value = ["/echo"], produces = ["text/plain"])
     private fun echo(request: HttpServletRequest): ResponseEntity<String> {
         val payload = request.getParameter("payload")
         return ResponseEntity.ok("Echo $payload")
     }
 
+    @Suppress("unused")
     @PostMapping(value = ["/payout"], produces = ["text/plain"])
     private fun spinPayout(request: HttpServletRequest): ResponseEntity<String> {
         val name = request.getParameter("name")

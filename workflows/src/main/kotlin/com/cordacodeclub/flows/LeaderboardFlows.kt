@@ -22,7 +22,7 @@ import java.time.Instant
 
 object LeaderboardFlows {
 
-    const val maxLeaderboardLength = 20;
+    const val maxLeaderboardLength = 20
 
     object Create {
 

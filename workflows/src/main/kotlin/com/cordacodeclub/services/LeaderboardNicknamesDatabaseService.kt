@@ -47,7 +47,7 @@ class LeaderboardNicknamesDatabaseService(services: ServiceHub) : DatabaseServic
         val params = mapOf(1 to linearId.toString())
         val results = executeQuery(query, params) { it -> it.getInt("rowCount") }
         if (results.isEmpty()) {
-            throw IllegalArgumentException("Wrong query.")
+            throw RuntimeException("Wrong query.")
         }
         val count = results.single()
         log.info("Nickname $linearId read from nicknames table.")
@@ -59,7 +59,7 @@ class LeaderboardNicknamesDatabaseService(services: ServiceHub) : DatabaseServic
         val params = mapOf(1 to linearId.toString())
         val results = executeQuery(query, params) { it -> it.getString(COL_NICKNAME) }
         if (results.isEmpty()) {
-            throw IllegalArgumentException("LinearId $linearId not present in database.")
+            throw RuntimeException("LinearId $linearId not present in database.")
         }
         val nickname = results.single()
         log.info("Nickname $linearId read from nicknames table.")
