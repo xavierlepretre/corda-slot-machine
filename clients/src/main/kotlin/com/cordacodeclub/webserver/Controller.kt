@@ -101,7 +101,7 @@ class Controller(val rpc: NodeRPCConnection) {
         val nickname = request.getParameter("nickname")
         return try {
             val createTx = proxy.startFlow(LeaderboardFlows.Create::SimpleInitiator,
-                    name, nickname, casino)
+                    name, nickname, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
             val entry = createTx.tx.outputsOfType<LeaderboardEntryState>().single()
             ResponseEntity.ok(LeaderboardEntryResult())
@@ -152,7 +152,7 @@ class Controller(val rpc: NodeRPCConnection) {
     private fun getLeaderboard(@Suppress("UNUSED_PARAMETER") request: HttpServletRequest): ResponseEntity<Any> {
         return try {
             val leaderboardEntries = proxy.startFlow(LeaderboardFlows.Fetch::Local,
-                    casino)
+                    quickConfig.casinoHost)
                     .returnValue.getOrThrow()
             ResponseEntity.ok(Leaderboard.fromNamedEntries(leaderboardEntries))
         } catch (error: Exception) {
