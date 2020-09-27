@@ -90,7 +90,7 @@ open class DatabaseService(private val services: ServiceHub) : SingletonSerializ
                 is String -> preparedStatement.setString(key, value)
                 is Int -> preparedStatement.setInt(key, value)
                 is Long -> preparedStatement.setLong(key, value)
-                else -> throw IllegalArgumentException("Unsupported type.")
+                else -> throw IllegalArgumentException("Unsupported type: ${value.javaClass}")
             }
         }
 
