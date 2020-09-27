@@ -69,17 +69,22 @@
 
     <div class="leaderboard_container">
         <div class="actions">
+            To load the current leaderboard, press: <button id="load_leaderboard">Load Leaderboard</button>
+            <br/>
+            To have your token balance be recorded in the leaderboard, enter:
             <label for="entry_nickname">Your nickname</label>
             <input id="entry_nickname" name="entry_nickname" placeholder="YourNickname" alt="Alphanumeric only" type="text"/>
+            and press
             <button id="enter_leaderboard">Enter Leaderboard</button>
             <br/>
-            <button id="load_leaderboard">Load Leaderboard</button>
+            To have the system forget all leaderboard entries associated with this account, press:
+            <button id="leave_leaderboard">Remove Me From All Leaderboards</button>
         </div>
         <table id="leaderboard_table">
             <thead>
                 <tr>
                     <th>When</th>
-                    <th>Who</th>
+                    <th>Nickname</th>
                     <th>Score</th>
                     <th style="display: none;">Linear Id</th>
                 </tr>

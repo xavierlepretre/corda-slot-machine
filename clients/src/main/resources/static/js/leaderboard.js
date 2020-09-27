@@ -23,6 +23,10 @@
         });
     };
 
+    function leaveLeaderboard(fnSuccess, fnError) {
+         window.ioServer.ajaxRequest({ name: window.accountName }, "POST", "/leaveLeaderboard", fnSuccess, fnError);
+    };
+
     // Bind events
     function setupButtons() {
         $("#enter_leaderboard").click(() => {
@@ -38,6 +42,13 @@
         });
         $("#load_leaderboard").click(() => {
             getLeaderboard(displayLeaderboard, window.alert);
+        });
+        $("#leave_leaderboard").click(() => {
+            if (confirm("Are you sure to erase all your information in all leaderboards?")) {
+                leaveLeaderboard(
+                    () => getLeaderboard(displayLeaderboard, window.alert),
+                    window.alert);
+            }
         });
     };
 

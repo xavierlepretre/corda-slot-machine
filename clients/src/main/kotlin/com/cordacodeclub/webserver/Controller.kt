@@ -114,6 +114,36 @@ class Controller(rpc: NodeRPCConnection) {
         } catch (error: AccountNotFoundException) {
             ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Account not found, you may want to reset")
+        } catch (error: NoTokensForLeaderboardException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(error.message)
+        } catch (error: ScoreTooLowForLeaderboardException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(error.message)
+        } catch (error: Exception) {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed $error")
+        }
+    }
+
+    @Suppress("unused")
+    // I wanted to use Delete but it getParameter to null
+    @PostMapping(value = ["/leaveLeaderboard"], produces = ["application/json"])
+    private fun leaveLeaderboard(request: HttpServletRequest): ResponseEntity<Any> {
+        val name = request.getParameter("name")!!
+        return try {
+            proxy.startFlow(LeaderboardFlows.Retire::SimpleInitiator, name)
+                    .returnValue.getOrThrow()
+            ResponseEntity.ok(LeaderboardLeaveResult())
+        } catch (error: NullPointerException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("name not found")
+        } catch (error: AccountNotFoundException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Account not found, you may want to reset")
+        } catch (error: NothingToRetireFromLeaderboardException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(error.message)
         } catch (error: Exception) {
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed $error")

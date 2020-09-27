@@ -45,6 +45,13 @@ data class LeaderboardEntryResult(
     constructor(error: String) : this(false, error)
 }
 
+data class LeaderboardLeaveResult(
+        val success: Boolean,
+        val error: String?) {
+    constructor() : this(true, null)
+    constructor(error: String) : this(false, error)
+}
+
 // Do not add the player's account name as at the moment we count on it to be like a password.
 data class LeaderboardEntry(
         val nickname: String,

@@ -1,6 +1,7 @@
 package com.cordacodeclub.flows
 
 import com.cordacodeclub.flows.LeaderboardFlows.LeaderboardNamedEntryState
+import com.cordacodeclub.services.leaderboardNicknamesDatabaseService
 import com.cordacodeclub.states.LeaderboardEntryState
 import com.cordacodeclub.states.LockableTokenState
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount
@@ -21,12 +22,13 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class LeaderboardFetchFlowTest {
+class LeaderboardRetireFlowTest {
     private lateinit var network: MockNetwork
     private lateinit var issuerNode: StartedMockNode
     private lateinit var issuerNodeParty: Party
     private lateinit var issuer: AbstractParty
     private lateinit var casinoNode: StartedMockNode
+    private lateinit var casino: Party
     private lateinit var playerNode: StartedMockNode
     private lateinit var playerNodeParty: Party
     private lateinit var player1: AbstractParty
@@ -45,6 +47,7 @@ class LeaderboardFetchFlowTest {
         issuerNode = network.createPartyNode()
         issuerNodeParty = issuerNode.info.legalIdentities.first()
         casinoNode = network.createPartyNode(CordaX500Name("Casino", "London", "GB"))
+        casino = casinoNode.info.legalIdentities.first()
         playerNode = network.createPartyNode(CordaX500Name("Player", "Paris", "FR"))
         playerNodeParty = playerNode.info.legalIdentities.first()
         network.runNetwork()
@@ -63,6 +66,9 @@ class LeaderboardFetchFlowTest {
                 .map { playerNode.services.createKeyForAccount(it) }
                 .onEach {
                     playerNode.startFlow(SyncKeyMappingInitiator(issuerNodeParty, listOf(it)))
+                            .also { network.runNetwork() }
+                            .get()
+                    playerNode.startFlow(SyncKeyMappingInitiator(casino, listOf(it)))
                             .also { network.runNetwork() }
                             .get()
                 }
@@ -92,7 +98,10 @@ class LeaderboardFetchFlowTest {
                 .outRefsOfType()
     }
 
-    private fun createEntry(playerNode: StartedMockNode, player: AbstractParty, nickname: String) = playerNode
+    private fun createEntry(playerNode: StartedMockNode,
+                            player: AbstractParty,
+                            nickname: String,
+                            issuer: AbstractParty = this.issuer) = playerNode
             .startFlow(LeaderboardFlows.Create.Initiator(player, nickname, issuer))
             .also { network.runNetwork() }
             .get()
@@ -102,37 +111,41 @@ class LeaderboardFetchFlowTest {
             .let { LeaderboardNamedEntryState(it, nickname) }
 
     @Test
-    fun `empty leaderboard returns empty`() {
-        val fetched = playerNode.startFlow(LeaderboardFlows.Fetch.Local(issuer))
+    fun `can retire a single entry`() {
+        issueToken(issuerNode, player1, issuer, 100L)
+        createEntry(playerNode, player1, "nickname1")
+        issueToken(casinoNode, player1, casino, 50L)
+        createEntry(playerNode, player1, "nickname1", casino)
+        issueToken(issuerNode, player2, issuer, 125L)
+        val entry3 = createEntry(playerNode, player2, "nickname2")
+        playerNode.startFlow(LeaderboardFlows.Retire.Initiator(player1))
                 .also { network.runNetwork() }
                 .get()
-        assertTrue(fetched.isEmpty())
-    }
-
-    @Test
-    fun `leaderboard with 1 entry returns it`() {
-        issueToken(issuerNode, player1, issuer, 100L)
-        val entry1 = createEntry(playerNode, player1, "nickname1")
         val fetched = playerNode.startFlow(LeaderboardFlows.Fetch.Local(issuer))
                 .also { network.runNetwork() }
                 .get()
         assertEquals(1, fetched.size)
-        assertEquals(entry1, fetched.single())
+        assertEquals(entry3, fetched.single())
     }
 
     @Test
-    fun `leaderboard with 3 entries returns them sorted`() {
+    fun `can retire 3 entries`() {
         issueToken(issuerNode, player1, issuer, 100L)
-        val entry1 = createEntry(playerNode, player1, "nickname1")
-        issueToken(issuerNode, player1, issuer, 50L)
-        val entry2 = createEntry(playerNode, player1, "nickname1")
+        createEntry(playerNode, player1, "nickname1")
+        issueToken(issuerNode, player1, issuer, 100L)
+        createEntry(playerNode, player1, "nickname1")
+        issueToken(casinoNode, player1, casino, 50L)
+        createEntry(playerNode, player1, "nickname1", casino)
         issueToken(issuerNode, player2, issuer, 125L)
         val entry3 = createEntry(playerNode, player2, "nickname2")
+        playerNode.startFlow(LeaderboardFlows.Retire.Initiator(player1))
+                .also { network.runNetwork() }
+                .get()
         val fetched = playerNode.startFlow(LeaderboardFlows.Fetch.Local(issuer))
                 .also { network.runNetwork() }
                 .get()
-        assertEquals(3, fetched.size)
-        assertEquals(listOf(entry2, entry3, entry1), fetched)
+        assertEquals(1, fetched.size)
+        assertEquals(entry3, fetched.single())
     }
 
 }
