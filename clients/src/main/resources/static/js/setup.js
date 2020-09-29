@@ -124,11 +124,11 @@
 
     // this emulates PrizesAndReels::ReelsForPrizeID
     // which the PHP would call from RandomLogic::PrizeAndReels after selecting a prize
-    function getReelsForPayout(payout) {
+    function getReelsForPayout(payout, curBet) {
       function getParsedRules(payout) {
         if (!payout)
           return { rules: { reel1: "*", reel2: "*", reel3: "*" } };
-        last_win = payout;
+        last_win = payout * curBet;
         const prize = prizes.find((it) => it.payout_winnings == payout);
         if (!prize) throw `Unsupported prize '${payout}'`;
         return {
@@ -172,10 +172,10 @@
       throw `Failed to find reels for '${payout}'`;
     }
 
-    function getResultReels(result) {
+    function getResultReels(result, curBet) {
       const { reels, id } = getReelsForPayout(
-        result.prize ? result.prize.payout_credits : 0
-      );
+        result.prize ? result.prize.payout_credits : 0,
+        curBet);
       result.reels = reels;
       if (id) result.prize.id = id;
       result.last_win = last_win;
@@ -216,7 +216,7 @@
           return;
         }
         try {
-          spinResult = getResultReels(spinResult);
+          spinResult = getResultReels(spinResult, curBet);
           fnSuccess(spinResult);
         } catch (err) {
           fnError();
