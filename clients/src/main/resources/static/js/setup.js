@@ -19,7 +19,7 @@
 
   const gameType = "default"; // Modify on this line which game Type you'd like to show
   const MIN_BET = 1;
-  const MAX_BET = 100;
+  const MAX_BET = 999999999;
   const ICONS_PER_REEL = 6;
   const DEFAULT_TIMEOUT = 30000; // 30 seconds
 
