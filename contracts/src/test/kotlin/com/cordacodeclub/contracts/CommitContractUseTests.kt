@@ -180,7 +180,8 @@ class CommitContractUseTests {
 
                     input(playerRef2.ref)
                     command(player.owningKey, Reveal(4, 1))
-                    reference(playerRef2.getGamePointer().pointer)
+                    // Put it back when we change corda version back to 4.5
+//                    reference(playerRef2.getGamePointer().pointer)
                     timeWindow(TimeWindow.untilOnly(Instant.now()))
                     verifies()
                 }
