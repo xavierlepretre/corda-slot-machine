@@ -1,0 +1,17 @@
+[Unit]
+Description=Corda
+After=network.target
+
+[Service]
+User=corda
+Group=corda
+WorkingDirectory=/opt/corda/
+ExecStart=/usr/bin/java -Xmx1g -jar corda.jar
+Restart=always
+RestartSec=10
+StandardOutput=logs/sysd.out
+StandardError=logs/sysd.err
+SyslogIdentifier=corda
+
+[Install]
+WantedBy=multi-user.target

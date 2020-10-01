@@ -3,7 +3,6 @@ package com.cordacodeclub.webserver
 import com.cordacodeclub.flows.*
 import com.cordacodeclub.flows.LockableTokenFlows.Fetch.NotEnoughTokensException
 import com.cordacodeclub.states.LeaderboardEntryState
-import net.corda.core.identity.CordaX500Name
 import net.corda.core.messaging.startFlow
 import net.corda.core.utilities.getOrThrow
 import org.slf4j.LoggerFactory
@@ -17,21 +16,15 @@ import javax.servlet.http.HttpServletRequest
  */
 @RestController
 @RequestMapping("/") // The paths for HTTP requests are relative to this base path.
-class Controller(rpc: NodeRPCConnection) {
+class Controller(val rpc: NodeRPCConnection) {
 
     companion object {
         private val logger = LoggerFactory.getLogger(RestController::class.java)
-
-        // TODO change
-        private val TODO_notary_x500 = CordaX500Name.parse("O=Notary, L=London, C=GB")
-        private val TODO_casino_x500 = CordaX500Name.parse("O=Casino, L=New York, C=US")
     }
 
     private val proxy = rpc.proxy
-    private val notary = proxy.notaryPartyFromX500Name(TODO_notary_x500)
-            ?: throw RuntimeException("Notary not found")
-    private val casino = proxy.wellKnownPartyFromX500Name(TODO_casino_x500)
-            ?: throw RuntimeException("Casino not found")
+    private val quickConfig = proxy.startFlow(::GetNotaryAndCasino)
+            .returnValue.getOrThrow()
 
     @Suppress("unused")
     @PostMapping(value = ["/create"], produces = ["text/plain"])
@@ -42,14 +35,17 @@ class Controller(rpc: NodeRPCConnection) {
                     .returnValue.getOrThrow()
                     .second
             proxy.startFlow(LockableTokenFlows.Issue::InitiatorBeg,
-                    LockableTokenFlows.Issue.Request(notary, player, casino))
+                    LockableTokenFlows.Issue.Request(quickConfig.notary, player, quickConfig.casinoHost))
                     .returnValue.getOrThrow()
-            val balance = proxy.startFlow(LockableTokenFlows.Balance::Local, player, casino)
+            val balance = proxy.startFlow(LockableTokenFlows.Balance::Local, player, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
             ResponseEntity.ok(balance.toString())
         } catch (error: AccountNotFoundException) {
             ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Account not found, you need to reset")
+        } catch (error: AccountAlreadyExistsException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Account $name already exists")
         } catch (error: Exception) {
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed $error")
@@ -60,7 +56,7 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = ["/balance"], produces = ["text/plain"])
     private fun balance(@RequestParam(value = "name") name: String): ResponseEntity<String> {
         return try {
-            val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, casino)
+            val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
             ResponseEntity.ok(balance.toString())
         } catch (error: AccountNotFoundException) {
@@ -78,16 +74,17 @@ class Controller(rpc: NodeRPCConnection) {
         val name = request.getParameter("name")
         val wager = request.getParameter("wager").toLong()
         return try {
-            val result = proxy.startFlow(GameFlows::SimpleInitiator, name, wager, casino, casino)
+            val result = proxy.startFlow(GameFlows::SimpleInitiator, quickConfig.notaryName,
+                    name, wager, quickConfig.casinoHost, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
-            val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, casino)
+            val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
             ResponseEntity.ok(SpinResult(result).copy(balance = balance, last_win = result.payout_credits))
         } catch (error: AccountNotFoundException) {
             ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Account not found, you may want to reset")
         } catch (error: NotEnoughTokensException) {
-            val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, casino)
+            val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
             ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("Not enough tokens to spin for $wager. Balance: $balance")
@@ -104,7 +101,7 @@ class Controller(rpc: NodeRPCConnection) {
         val nickname = request.getParameter("nickname")
         return try {
             val createTx = proxy.startFlow(LeaderboardFlows.Create::SimpleInitiator,
-                    name, nickname, casino)
+                    name, nickname, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
             val entry = createTx.tx.outputsOfType<LeaderboardEntryState>().single()
             ResponseEntity.ok(LeaderboardEntryResult())
@@ -155,7 +152,7 @@ class Controller(rpc: NodeRPCConnection) {
     private fun getLeaderboard(@Suppress("UNUSED_PARAMETER") request: HttpServletRequest): ResponseEntity<Any> {
         return try {
             val leaderboardEntries = proxy.startFlow(LeaderboardFlows.Fetch::Local,
-                    casino)
+                    quickConfig.casinoHost)
                     .returnValue.getOrThrow()
             ResponseEntity.ok(Leaderboard.fromNamedEntries(leaderboardEntries))
         } catch (error: Exception) {
@@ -185,7 +182,8 @@ class Controller(rpc: NodeRPCConnection) {
         val name = request.getParameter("name")
         val wager = request.getParameter("wager").toLong()
         return try {
-            val result = proxy.startFlow(GameFlows::SimpleInitiator, name, wager, casino, casino)
+            val result = proxy.startFlow(GameFlows::SimpleInitiator, quickConfig.notaryName, name,
+                    wager, quickConfig.casinoHost, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
             // returns a single simple element from the GameResult
             ResponseEntity.ok("Created ${result.payout_credits}")

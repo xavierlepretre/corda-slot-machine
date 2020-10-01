@@ -73,6 +73,12 @@ allprojects {
         preserveFileTimestamps = false
         reproducibleFileOrder = true
     }
+
+    test {
+        maxHeapSize = '2G'
+        maxParallelForks = 1
+        forkEvery = 1
+    }
 }
 
 apply plugin: 'net.corda.plugins.cordapp'
@@ -94,6 +100,7 @@ dependencies {
     cordaRuntime "$corda_release_group:corda:$corda_release_version"
 
     // CorDapp dependencies.
+    cordapp project(":clients")
     cordapp project(":workflows")
     cordapp project(":contracts")
 
@@ -136,7 +143,12 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
             deploy = false
         }
         cordapp project(':contracts')
-        cordapp project(':workflows')
+        cordapp (project(':workflows')) {
+            config """
+                notary="O=Notary,L=London,C=GB"
+                casinoHost="O=Casino,L=New York,C=US"
+            """
+        }
         cordapp "$confidential_id_release_group:ci-workflows:$confidential_id_release_version"
         cordapp "$accounts_release_group:accounts-workflows:$accounts_release_version"
         cordapp "$accounts_release_group:accounts-contracts:$accounts_release_version"

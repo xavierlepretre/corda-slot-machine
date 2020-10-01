@@ -25,11 +25,18 @@ dependencies {
     compile "org.slf4j:jul-to-slf4j:$slf4j_version"
 }
 
-
 springBoot {
     mainClassName = "com.cordacodeclub.webserver.ServerKt"
 }
-
+jar {
+    enabled=true
+    manifest {
+        attributes "Main-Class": "com.cordacodeclub.webserver.ServerKt"
+    }
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
 // task runPartiesClient(type: JavaExec, dependsOn: assemble) {
 //     classpath = sourceSets.main.runtimeClasspath
 //     main = 'com.cordacodeclub.ClientKt'

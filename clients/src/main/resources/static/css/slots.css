@@ -105,10 +105,18 @@ a img { border: none; }
 
 /*---------*/
 
+.leaderboard_container {
+    margin: auto;
+    width: fit-content
+}
+
 table#leaderboard_table {
     border: 1px solid black;
+    border-collapse: collapse;
 }
 
 table#leaderboard_table th, table#leaderboard_table td {
     border: 1px solid black;
+    padding: 0.3em;
+    text-align: center
 }

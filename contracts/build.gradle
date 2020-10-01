@@ -9,6 +9,19 @@ cordapp {
         licence "Apache License, Version 2.0"
         versionId 1
     }
+    signing {
+        enabled false // Set to true and uncomment the below when you want to assemble and sign
+//        options {
+//            Properties signing = new Properties()
+//            file("$projectDir/../signing.properties").withInputStream { signing.load(it) }
+//
+//            keystore signing.getProperty("jar.sign.keystore")
+//            alias signing.getProperty("jar.sign.alias")
+//            storepass getProperty("SIGN_PASS")
+//            keypass getProperty("SIGN_PASS")
+//            storetype "PKCS12"
+//        }
+    }
 }
 
 dependencies {

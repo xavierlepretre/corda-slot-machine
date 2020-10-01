@@ -5,7 +5,11 @@
             { name: window.accountName, nickname: nickname },
             "POST", "/enterLeaderboard",
             fnSuccess, fnError);
-    }
+    };
+
+    function loadLeaderboard() {
+        getLeaderboard(displayLeaderboard, window.alert);
+    };
 
     function getLeaderboard(fnSuccess, fnError) {
          window.ioServer.ajaxRequest({}, "GET", "/leaderboard", fnSuccess, fnError);
@@ -13,8 +17,9 @@
 
     function displayLeaderboard(receivedLeaderboard) {
         const leaderboardContent = $("#leaderboard_content").empty();
-        receivedLeaderboard.forEach((entry) => {
+        receivedLeaderboard.forEach((entry, index) => {
             const newRow = $($("#leaderboard_entry").html());
+            newRow.find(".index").text(index + 1);
             newRow.find(".when").text(entry.creationDate);
             newRow.find(".who").text(entry.nickname);
             newRow.find(".score").text(entry.total);
@@ -37,7 +42,7 @@
             }
             enterLeaderboard(
                 nickname,
-                () => getLeaderboard(displayLeaderboard, window.alert),
+                loadLeaderboard,
                 window.alert);
         });
         $("#load_leaderboard").click(() => {
@@ -46,7 +51,7 @@
         $("#leave_leaderboard").click(() => {
             if (confirm("Are you sure to erase all your information in all leaderboards?")) {
                 leaveLeaderboard(
-                    () => getLeaderboard(displayLeaderboard, window.alert),
+                    loadLeaderboard,
                     window.alert);
             }
         });
@@ -54,6 +59,7 @@
 
     $(window).on("load", function () {
         setupButtons();
+        loadLeaderboard()
     });
 
 })();

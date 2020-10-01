@@ -26,6 +26,14 @@ class AccountNotFoundException(message: String?, cause: Throwable?, originalErro
     constructor() : this(null, null)
 }
 
+class AccountAlreadyExistsException(message: String?, cause: Throwable?, originalErrorId: Long? = null) :
+        FlowException(message, cause, originalErrorId), IdentifiableException {
+    constructor(message: String?, cause: Throwable?) : this(message, cause, null)
+    constructor(message: String?) : this(message, null)
+    constructor(cause: Throwable?) : this(cause?.toString(), cause)
+    constructor() : this(null, null)
+}
+
 class MoreThanOneAccountFoundException(message: String?, cause: Throwable?, originalErrorId: Long? = null) :
         FlowException(message, cause, originalErrorId), IdentifiableException {
     constructor(message: String?, cause: Throwable?) : this(message, cause, null)

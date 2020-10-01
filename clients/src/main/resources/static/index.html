@@ -1,9 +1,18 @@
 <head>
-    <title>Slots</title>
+    <title>Wizards Corda Slot Machine</title>
     <link type="text/css" rel="stylesheet" href="css/slots.css" />
     <link type="text/css" rel="stylesheet" href="css/template2.css" />
     <link type="text/css" rel="stylesheet" href="css/jquery-ui.1.8.17.min.css" />
     <meta name="viewport" content="width=880, user-scalable=no, target-densitydpi=device-dpi" />
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-179113714-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-179113714-1');
+    </script>
 </head>
 
 <body>
@@ -36,7 +45,7 @@
 
                 <div class="slot_machine_failed_request_message" style="display: none;"><span class="large">Sorry, we're
                         unable to display your spin because your connection to our server was lost. </span><br />
-                    Rest assured that your spin was not wasted.
+                    Rest assured that your spin was <a href="https://www.latlmes.com/breaking/your-sensational-news-headline-here-1">not wasted</a>.
                     Please check your connection and <a href="#" onclick="window.location.reload();">refresh</a> to try
                     again.
                 </div>
@@ -60,6 +69,7 @@
 
     <template id="leaderboard_entry">
         <tr>
+            <td class="index"></td>
             <td class="when"></td>
             <td class="who"></td>
             <td class="score"></td>
@@ -68,31 +78,36 @@
     </template>
 
     <div class="leaderboard_container">
-        <div class="actions">
-            To load the current leaderboard, press: <button id="load_leaderboard">Load Leaderboard</button>
-            <br/>
-            To have your token balance be recorded in the leaderboard, enter:
+        <div>
+            Want to be in?
             <label for="entry_nickname">Your nickname</label>
             <input id="entry_nickname" name="entry_nickname" placeholder="YourNickname" alt="Alphanumeric only" type="text"/>
-            and press
-            <button id="enter_leaderboard">Enter Leaderboard</button>
-            <br/>
-            To have the system forget all leaderboard entries associated with this account, press:
-            <button id="leave_leaderboard">Remove Me From All Leaderboards</button>
+            <button id="enter_leaderboard" class="ui-button ui-widget ui-corner-all">Add my score</button>
         </div>
-        <table id="leaderboard_table">
+        <table id="leaderboard_table" border="1" >
             <thead>
                 <tr>
+                    <th colspan="4">Leaderboard</th>
+                </tr>
+                <tr>
+                    <th>Rank</th>
                     <th>When</th>
                     <th>Nickname</th>
                     <th>Score</th>
                     <th style="display: none;">Linear Id</th>
                 </tr>
             </thead>
-            <tbody id="leaderboard_content">
+            <tbody id="leaderboard_content" class="ui-widget-content">
 
             </tbody>
         </table>
+        <div>
+            <button id="load_leaderboard" class="ui-button ui-widget ui-corner-all">Reload manually</button>
+        </div>
+        <div>
+            Boohoo! I want out. To have the system forget all leaderboard entries associated with this account, press:
+            <button id="leave_leaderboard" class="ui-button ui-widget ui-corner-all">Remove Me From All Leaderboards</button>
+        </div>
     </div>
 
     <div id="loginDialog" title="Login dialog" style="font-size: 1em">
