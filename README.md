@@ -72,3 +72,13 @@ Then, play:
     ```shell
     >>> flow start com.cordacodeclub.flows.LockableTokenFlows$Balance$Local holder: Casino, issuer: Casino
     ```
+
+## Explainers
+
+![Random number generation](images/1-random-number-to-reward.jpg)
+
+![Commit reveal steps](images/2-commit-reveal.jpg)
+
+![Tx transitions happy path](images/3-tx-transitions-happy-path.jpg)
+
+![Game flow happy path](images/4-game-flow-happy-path.jpg)
