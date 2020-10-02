@@ -107,7 +107,9 @@ a img { border: none; }
 
 .leaderboard_container {
     margin: auto;
-    width: fit-content
+    padding: 0.5em;
+    width: fit-content;
+    background-color: white;
 }
 
 table#leaderboard_table {
@@ -119,4 +121,14 @@ table#leaderboard_table th, table#leaderboard_table td {
     border: 1px solid black;
     padding: 0.3em;
     text-align: center
+}
+
+/*---------*/
+
+#style_template_container {
+    position: absolute;
+    top: 0;
+    right: 0;
+    border: 1px grey solid;
+    padding: 0.3em;
 }
