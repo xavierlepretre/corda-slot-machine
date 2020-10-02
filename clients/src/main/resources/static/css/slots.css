@@ -107,7 +107,9 @@ a img { border: none; }
 
 .leaderboard_container {
     margin: auto;
-    width: fit-content
+    padding: 0.5em;
+    width: fit-content;
+    background-color: white;
 }
 
 table#leaderboard_table {
