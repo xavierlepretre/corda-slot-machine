@@ -1,8 +1,13 @@
 <head>
     <title>Wizards Corda Slot Machine</title>
     <link type="text/css" rel="stylesheet" href="css/slots.css" />
-    <link type="text/css" rel="stylesheet" href="css/template2.css" />
-    <link type="text/css" rel="stylesheet" href="css/jquery-ui.1.8.17.min.css" />
+    <link type="text/css" rel="alternate stylesheet" href="css/template1.css" title="template1" />
+    <link type="text/css" rel="stylesheet" href="css/template2.css" title="template2" />
+    <link type="text/css" rel="alternate stylesheet" href="css/template3.css" title="template3" />
+    <link type="text/css" rel="alternate stylesheet" href="css/template4.css" title="template4" />
+    <link type="text/css" rel="alternate stylesheet" href="css/template5.css" title="template5" />
+    <link type="text/css" rel="alternate stylesheet" href="css/template6.css" title="template6" />
+    <link type="text/css" rel="stylesheet" href="css/jquery-ui.1.12.1.min.css" />
     <meta name="viewport" content="width=880, user-scalable=no, target-densitydpi=device-dpi" />
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-179113714-1"></script>
@@ -67,6 +72,22 @@
         </div>
     </div>
 
+    <fieldset id="style_template_container">
+        <label for="style_template_id">Style:</label>
+        <select id="style_template_id" name="style_template_id" title="Pick a style">
+            <optgroup label="Out of the box">
+                <option value="template1">Blue and Orange</option>
+                <option value="template2" selected="selected">Standard</option>
+                <option value="template3">Underwater</option>
+                <option value="template4">Sweet Tooth</option>
+                <option value="template5">Chrome Lever</option>
+            </optgroup>
+            <optgroup label="Corda Code Club">
+                <option value="template6">Lego Bricks</option>
+            </optgroup>
+        </select>
+    </fieldset>
+
     <template id="leaderboard_entry">
         <tr>
             <td class="index"></td>
@@ -105,7 +126,8 @@
             <button id="load_leaderboard" class="ui-button ui-widget ui-corner-all">Reload manually</button>
         </div>
         <div>
-            Boohoo! I want out. To have the system forget all leaderboard entries associated with this account, press:
+            Boohoo! I want out. To have the system forget all leaderboard entries<br/>
+            associated with this account, press:
             <button id="leave_leaderboard" class="ui-button ui-widget ui-corner-all">Remove Me From All Leaderboards</button>
         </div>
     </div>
@@ -143,12 +165,13 @@
     </div>
 
     <script type="text/javascript" src="js/jquery-1.7.1.min.js"></script>
-     <script type="text/javascript" src="js/jquery-ui.1.8.17.min.js"></script>
+     <script type="text/javascript" src="js/jquery-ui.1.12.1.min.js"></script>
     <script type="text/javascript" src="js/soundmanager2.js"></script>
     <script type="text/javascript" src="js/setup.js"></script>
     <script type="text/javascript" src="js/js.cookie.min.js"></script>
     <script type="text/javascript" src="js/login.js"></script>
     <script type="text/javascript" src="js/leaderboard.js"></script>
+    <script type="text/javascript" src="js/style.js"></script>
     <script type="text/javascript" src="js/slots.js"></script>
 </body>
 

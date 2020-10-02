@@ -122,3 +122,13 @@ table#leaderboard_table th, table#leaderboard_table td {
     padding: 0.3em;
     text-align: center
 }
+
+/*---------*/
+
+#style_template_container {
+    position: absolute;
+    top: 0;
+    right: 0;
+    border: 1px grey solid;
+    padding: 0.3em;
+}

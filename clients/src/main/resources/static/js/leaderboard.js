@@ -59,7 +59,7 @@
 
     $(window).on("load", function () {
         setupButtons();
-        loadLeaderboard()
+        loadLeaderboard();
     });
 
 })();
