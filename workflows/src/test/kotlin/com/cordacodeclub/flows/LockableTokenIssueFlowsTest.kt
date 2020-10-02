@@ -1,14 +1,17 @@
 package com.cordacodeclub.flows
 
+import com.cordacodeclub.flows.GetNotaryAndCasino.Companion.configPlayerHostKey
 import com.cordacodeclub.states.LockableTokenState
 import com.cordacodeclub.states.LockableTokenType
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount
 import com.r3.corda.lib.accounts.workflows.internal.flows.createKeyForAccount
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingInitiator
 import net.corda.core.contracts.Amount
+import net.corda.core.flows.FlowException
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.utilities.getOrThrow
 import net.corda.testing.node.MockNetwork
 import net.corda.testing.node.MockNetworkParameters
 import net.corda.testing.node.StartedMockNode
@@ -16,6 +19,7 @@ import net.corda.testing.node.TestCordapp
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 
 class LockableTokenIssueFlowsTest {
@@ -27,20 +31,26 @@ class LockableTokenIssueFlowsTest {
     private lateinit var holderNodeParty: Party
     private lateinit var holder1: AbstractParty
     private lateinit var holder2: AbstractParty
+    private lateinit var otherNode: StartedMockNode
+    private lateinit var otherNodeParty: Party
 
     @Before
     fun setup() {
+        val holderHostName = "O=Holder, L=Paris, C=FR"
         network = MockNetwork(MockNetworkParameters()
                 .withCordappsForAllNodes(listOf(
                         TestCordapp.findCordapp("com.r3.corda.lib.accounts.contracts"),
                         TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
                         TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
                         TestCordapp.findCordapp("com.cordacodeclub.contracts"),
-                        TestCordapp.findCordapp("com.cordacodeclub.flows"))))
+                        TestCordapp.findCordapp("com.cordacodeclub.flows")
+                                .withConfig(mapOf(configPlayerHostKey to holderHostName)))))
         issuerNode = network.createPartyNode(CordaX500Name.parse("O=Issuer, L=London, C=GB"))
         issuerNodeParty = issuerNode.info.legalIdentities.first()
-        holderNode = network.createPartyNode(CordaX500Name.parse("O=Holder, L=Paris, C=FR"))
+        holderNode = network.createPartyNode(CordaX500Name.parse(holderHostName))
         holderNodeParty = holderNode.info.legalIdentities.first()
+        otherNode = network.createPartyNode()
+        otherNodeParty = otherNode.info.legalIdentities.first()
         network.runNetwork()
         prepareIssuerAndHolders()
     }
@@ -144,6 +154,20 @@ class LockableTokenIssueFlowsTest {
             assertEquals(1, vaultTokens.size)
             assertEquals(output, vaultTokens.single())
         }
+    }
+
+    @Test
+    fun `cannot beg from wrong host`() {
+        issuerNode.startFlow(SyncKeyMappingInitiator(otherNodeParty, listOf(issuer)))
+                .also { network.runNetwork() }
+                .get()
+        val error = assertThrows<FlowException> {
+            otherNode.startFlow(LockableTokenFlows.Issue.InitiatorBeg(
+                    LockableTokenFlows.Issue.Request(network.defaultNotaryIdentity, otherNodeParty, issuer)))
+                    .also { network.runNetwork() }
+                    .getOrThrow()
+        }
+        assertEquals("Your host is not allowed to beg for tokens", error.message)
     }
 
 }
