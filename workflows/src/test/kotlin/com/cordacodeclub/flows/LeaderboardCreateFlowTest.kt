@@ -98,6 +98,17 @@ class LeaderboardCreateFlowTest {
                 .outRefsOfType()
     }
 
+    private fun redeemTokens(holderNode: StartedMockNode,
+                             tokens: List<StateAndRef<LockableTokenState>>,
+                             change: Long): StateAndRef<LockableTokenState> {
+        return holderNode.startFlow(LockableTokenFlows.Redeem.Initiator(tokens, change))
+                .also { network.runNetwork() }
+                .get()
+                .tx
+                .outRefsOfType<LockableTokenState>()
+                .single()
+    }
+
     private fun createEntry(playerNode: StartedMockNode, player: AbstractParty, nickname: String) = playerNode
             .startFlow(LeaderboardFlows.Create.Initiator(player, nickname, issuer))
             .also { network.runNetwork() }
@@ -151,7 +162,7 @@ class LeaderboardCreateFlowTest {
                     .also { network.runNetwork() }
                     .getOrThrow()
         }
-        assertEquals("Same player cannot enter the leaderboard with identical total", error.message)
+        assertEquals("Same player cannot enter the leaderboard with identical or lower total", error.message)
     }
 
     @Test
@@ -232,11 +243,24 @@ class LeaderboardCreateFlowTest {
         }
         issueToken(issuerNode, player3, issuer, 10L)
         val error = assertThrows<FlowException> {
-            playerNode.startFlow(LeaderboardFlows.Create.Initiator(player3, "nick3", issuer))
+            playerNode.startFlow(LeaderboardFlows.Create.Initiator(player3, "nickname3", issuer))
                     .also { network.runNetwork() }
                     .getOrThrow()
         }
         assertEquals("The player does not qualify to enter the leaderboard", error.message)
+    }
+
+    @Test
+    fun `cannot create leaderboard entry if the player has higher score`() {
+        val issuedToken = issueToken(issuerNode, player1, issuer, 10L)
+        val first = createEntry(playerNode, player1, "nickname1")
+        redeemTokens(playerNode, listOf(issuedToken), 9L)
+        val error = assertThrows<FlowException> {
+            playerNode.startFlow(LeaderboardFlows.Create.Initiator(player1, "nickname2", issuer))
+                    .also { network.runNetwork() }
+                    .getOrThrow()
+        }
+        assertEquals("Same player cannot enter the leaderboard with identical or lower total", error.message)
     }
 
 }

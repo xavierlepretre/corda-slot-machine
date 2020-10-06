@@ -131,8 +131,8 @@ object LeaderboardFlows {
                         else if (entriesToKeep.size == maxLeaderboardLength)
                             throw ScoreTooLowForLeaderboardException("The player does not qualify to enter the leaderboard")
                         else null
-                if (entriesToKeep.map { it.state.data }.any { it.player == player && it.total == playerTotal })
-                    throw FlowException("Same player cannot enter the leaderboard with identical total")
+                if (entriesToKeep.map { it.state.data }.any { it.player == player && playerTotal <= it.total })
+                    throw FlowException("Same player cannot enter the leaderboard with identical or lower total")
 
                 progressTracker.currentStep = GeneratingTransaction
                 val notary = tokenStates.map { it.state.notary }
