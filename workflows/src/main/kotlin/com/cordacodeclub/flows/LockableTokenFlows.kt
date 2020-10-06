@@ -616,12 +616,17 @@ object LockableTokenFlows {
             override fun call(): SignedTransaction {
                 progressTracker.currentStep = GeneratingTransaction
                 val builder = TransactionBuilder(states[0].state.notary)
-                        .addCommand(Redeem(states.indices.toList(), listOf(0)),
-                                listOf(holder.owningKey, issuer.owningKey))
                 states.forEach { builder.addInputState(it) }
-                builder.addOutputState(
-                        LockableTokenState(holder, issuer, Amount(change, LockableTokenType)),
-                        LockableTokenContract.id)
+                if (change == 0L) {
+                    builder.addCommand(Redeem(states.indices.toList(), listOf()),
+                            listOf(holder.owningKey, issuer.owningKey))
+                } else {
+                    builder.addCommand(Redeem(states.indices.toList(), listOf(0)),
+                            listOf(holder.owningKey, issuer.owningKey))
+                            .addOutputState(
+                                    LockableTokenState(holder, issuer, Amount(change, LockableTokenType)),
+                                    LockableTokenContract.id)
+                }
 
                 progressTracker.currentStep = VerifyingTransaction
                 builder.verify(serviceHub)
@@ -657,7 +662,7 @@ object LockableTokenFlows {
         }
 
         /**
-         * Receives the issued tokens.
+         * Redeems the issued tokens. Running on the issuer node.
          */
         @InitiatedBy(Initiator::class)
         class Responder(private val issuerSession: FlowSession,
