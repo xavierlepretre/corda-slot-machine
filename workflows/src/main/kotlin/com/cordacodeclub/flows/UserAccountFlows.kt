@@ -8,6 +8,7 @@ import com.r3.corda.lib.accounts.workflows.flows.ShareAccountInfoFlow
 import com.r3.corda.lib.accounts.workflows.flows.ShareAccountInfoHandlerFlow
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.flows.*
+import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.AnonymousParty
 import net.corda.core.identity.Party
 import net.corda.core.serialization.CordaSerializable
@@ -17,6 +18,18 @@ import java.security.PublicKey
 import java.util.*
 
 object UserAccountFlows {
+
+    object Get {
+
+        /**
+         * A way for the RPC to get this information.
+         */
+        @StartableByRPC
+        class Local(private val accountName: String) : FlowLogic<AbstractParty>() {
+            @Suspendable
+            override fun call() = getParty(accountName)
+        }
+    }
 
     object Create {
 
