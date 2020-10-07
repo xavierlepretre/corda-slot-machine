@@ -2,6 +2,7 @@ package com.cordacodeclub.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.LockableTokenContract
+import com.cordacodeclub.flows.GetNotaryAndCasino.Companion.getPlayerHost
 import com.cordacodeclub.contracts.LockableTokenContract.Commands.Issue
 import com.cordacodeclub.contracts.LockableTokenContract.Commands.Redeem
 import com.cordacodeclub.schema.LockableTokenSchemaV1
@@ -220,6 +221,8 @@ object LockableTokenFlows {
             constructor(request: Request) : this(request, tracker())
 
             companion object {
+                object ResolvingHolder : ProgressTracker.Step("Resolving holder.")
+                object VerifyingAuthorisation : ProgressTracker.Step("Verifying if authorised.")
                 object ResolvingIssuer : ProgressTracker.Step("Resolving issuer.")
                 object PassingOnToInitiator : ProgressTracker.Step("Passing on to initiator.") {
                     override fun childProgressTracker() = Initiator.tracker()
@@ -229,6 +232,8 @@ object LockableTokenFlows {
                 object SendingRequestInformation : ProgressTracker.Step("Sending request information.")
 
                 fun tracker() = ProgressTracker(
+                        ResolvingHolder,
+                        VerifyingAuthorisation,
                         ResolvingIssuer,
                         PassingOnToInitiator,
                         SendingHolderInformation,
@@ -237,10 +242,17 @@ object LockableTokenFlows {
 
             @Suspendable
             override fun call(): SignedTransaction {
+                progressTracker.currentStep = ResolvingHolder
+                val holderHost = serviceHub.identityService.wellKnownPartyFromAnonymous(request.holder)
+                        ?: throw FlowException("Could not resolve holder")
+
+                progressTracker.currentStep = VerifyingAuthorisation
+                val allowedHost = serviceHub.getPlayerHost()
+                if (allowedHost != holderHost) throw FlowException("Your host is not allowed to beg for tokens")
+
                 progressTracker.currentStep = ResolvingIssuer
-                val issuerHost =
-                        serviceHub.identityService.wellKnownPartyFromAnonymous(request.issuer)
-                                ?: throw FlowException("Could not resolve issuer")
+                val issuerHost = serviceHub.identityService.wellKnownPartyFromAnonymous(request.issuer)
+                        ?: throw FlowException("Could not resolve issuer")
                 return if (issuerHost == ourIdentity) {
                     progressTracker.currentStep = PassingOnToInitiator
                     subFlow(Initiator(request.notary, request.holder, automaticAmount, request.issuer,
