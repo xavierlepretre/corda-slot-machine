@@ -10,9 +10,13 @@
     function loadLeaderboard() {
         getLeaderboard(displayLeaderboard, window.alert);
     };
+    window.loadLeaderboard = loadLeaderboard;
 
     function getLeaderboard(fnSuccess, fnError) {
-         window.ioServer.ajaxRequest({}, "GET", "/leaderboard", fnSuccess, fnError);
+         window.ioServer.ajaxRequest(
+         { name: window.accountName },
+         "GET", "/leaderboard",
+         fnSuccess, fnError);
     };
 
     function displayLeaderboard(receivedLeaderboard) {
@@ -24,6 +28,7 @@
             newRow.find(".who").text(entry.nickname);
             newRow.find(".score").text(entry.total);
             newRow.find(".linearId").text(entry.linearId);
+            if (entry.me) newRow.addClass("is_me");
             leaderboardContent.append(newRow);
         });
     };

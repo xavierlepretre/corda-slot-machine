@@ -123,6 +123,10 @@ table#leaderboard_table th, table#leaderboard_table td {
     text-align: center
 }
 
+table#leaderboard_table tr.is_me {
+    background-color: gainsboro
+}
+
 /*---------*/
 
 #style_template_container {

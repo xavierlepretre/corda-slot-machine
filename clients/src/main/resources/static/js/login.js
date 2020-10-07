@@ -43,6 +43,8 @@
       if (started) cookieDelete();
     }
     $el.dialog("close");
+    console.log(typeof window.loadLeaderboard);
+    if (typeof window.loadLeaderboard === "function") window.loadLeaderboard();
   }
 
   function onStart() {

@@ -16,10 +16,10 @@ import javax.servlet.http.HttpServletRequest
  */
 @RestController
 @RequestMapping("/") // The paths for HTTP requests are relative to this base path.
-class Controller(val rpc: NodeRPCConnection) {
+class Controller(rpc: NodeRPCConnection) {
 
     companion object {
-        private val logger = LoggerFactory.getLogger(RestController::class.java)
+        private val logger = LoggerFactory.getLogger(Controller::class.java)
     }
 
     private val proxy = rpc.proxy
@@ -30,6 +30,7 @@ class Controller(val rpc: NodeRPCConnection) {
     @PostMapping(value = ["/create"], produces = ["text/plain"])
     private fun create(request: HttpServletRequest): ResponseEntity<String> {
         val name = request.getParameter("name")
+        logger.debug("Create user $name")
         return try {
             val player = proxy.startFlow(UserAccountFlows.Create::Initiator, name)
                     .returnValue.getOrThrow()
@@ -55,6 +56,7 @@ class Controller(val rpc: NodeRPCConnection) {
     @Suppress("unused")
     @GetMapping(value = ["/balance"], produces = ["text/plain"])
     private fun balance(@RequestParam(value = "name") name: String): ResponseEntity<String> {
+        logger.debug("Get balance for user $name")
         return try {
             val balance = proxy.startFlow(LockableTokenFlows.Balance::SimpleLocal, name, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
@@ -73,6 +75,7 @@ class Controller(val rpc: NodeRPCConnection) {
     private fun spin(request: HttpServletRequest): ResponseEntity<Any> {
         val name = request.getParameter("name")
         val wager = request.getParameter("wager").toLong()
+        logger.debug("Spin for user $name with $wager")
         return try {
             val result = proxy.startFlow(GameFlows::SimpleInitiator, quickConfig.notaryName,
                     name, wager, quickConfig.casinoHost, quickConfig.casinoHost)
@@ -99,11 +102,12 @@ class Controller(val rpc: NodeRPCConnection) {
     private fun enterLeaderboard(request: HttpServletRequest): ResponseEntity<Any> {
         val name = request.getParameter("name")
         val nickname = request.getParameter("nickname")
+        logger.debug("Enter leaderboard user $name as $nickname")
         return try {
             val createTx = proxy.startFlow(LeaderboardFlows.Create::SimpleInitiator,
                     name, nickname, quickConfig.casinoHost)
                     .returnValue.getOrThrow()
-            val entry = createTx.tx.outputsOfType<LeaderboardEntryState>().single()
+            createTx.tx.outputsOfType<LeaderboardEntryState>().single()
             ResponseEntity.ok(LeaderboardEntryResult())
         } catch (error: NullPointerException) {
             ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -128,6 +132,7 @@ class Controller(val rpc: NodeRPCConnection) {
     @PostMapping(value = ["/leaveLeaderboard"], produces = ["application/json"])
     private fun leaveLeaderboard(request: HttpServletRequest): ResponseEntity<Any> {
         val name = request.getParameter("name")!!
+        logger.debug("Leave leaderboard for user $name")
         return try {
             proxy.startFlow(LeaderboardFlows.Retire::SimpleInitiator, name)
                     .returnValue.getOrThrow()
@@ -150,11 +155,16 @@ class Controller(val rpc: NodeRPCConnection) {
     @Suppress("unused")
     @GetMapping(value = ["/leaderboard"], produces = ["application/json"])
     private fun getLeaderboard(@Suppress("UNUSED_PARAMETER") request: HttpServletRequest): ResponseEntity<Any> {
+        val name = request.getParameter("name")
+        logger.debug("List leaderboard by user $name")
         return try {
             val leaderboardEntries = proxy.startFlow(LeaderboardFlows.Fetch::Local,
                     quickConfig.casinoHost)
                     .returnValue.getOrThrow()
-            ResponseEntity.ok(Leaderboard.fromNamedEntries(leaderboardEntries))
+            val me = name?.let {
+                proxy.startFlow(UserAccountFlows.Get::Local, it).returnValue.getOrThrow()
+            }
+            ResponseEntity.ok(Leaderboard.fromNamedEntries(leaderboardEntries, me))
         } catch (error: Exception) {
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed $error")

@@ -2,6 +2,7 @@ package com.cordacodeclub.webserver
 
 import com.cordacodeclub.flows.GameResult
 import com.cordacodeclub.flows.LeaderboardFlows
+import net.corda.core.identity.AbstractParty
 
 // don't change the name or types of the elements of this class
 // they are as expected by the client-side JavaScript
@@ -57,17 +58,21 @@ data class LeaderboardEntry(
         val nickname: String,
         val total: Long,
         val creationDate: String,
-        val linearId: String) {
-    constructor(entry: LeaderboardFlows.LeaderboardNamedEntryState)
+        val linearId: String,
+        val isMe: Boolean) {
+    constructor(entry: LeaderboardFlows.LeaderboardNamedEntryState, me: AbstractParty?)
             : this(entry.nickname,
             entry.state.state.data.total.quantity,
             entry.state.state.data.creationDate.toString(),
-            entry.state.state.data.linearId.id.toString())
+            entry.state.state.data.linearId.id.toString(),
+            entry.state.state.data.player == me)
 }
 
 data class Leaderboard(val entries: List<LeaderboardEntry>) {
     companion object {
-        fun fromNamedEntries(entries: List<LeaderboardFlows.LeaderboardNamedEntryState>) = entries
-                .map(::LeaderboardEntry)
+        fun fromNamedEntries(
+                entries: List<LeaderboardFlows.LeaderboardNamedEntryState>,
+                me: AbstractParty?) = entries
+                .map { entry -> LeaderboardEntry(entry, me) }
     }
 }
