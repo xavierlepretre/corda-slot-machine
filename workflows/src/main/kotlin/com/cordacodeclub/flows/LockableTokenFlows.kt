@@ -3,6 +3,8 @@ package com.cordacodeclub.flows
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.LockableTokenContract
 import com.cordacodeclub.flows.GetNotaryAndCasino.Companion.getPlayerHost
+import com.cordacodeclub.contracts.LockableTokenContract.Commands.Issue
+import com.cordacodeclub.contracts.LockableTokenContract.Commands.Redeem
 import com.cordacodeclub.schema.LockableTokenSchemaV1
 import com.cordacodeclub.states.LockableTokenState
 import com.cordacodeclub.states.LockableTokenType
@@ -109,7 +111,7 @@ object LockableTokenFlows {
             override fun call(): SignedTransaction {
                 progressTracker.currentStep = GeneratingTransaction
                 val builder = TransactionBuilder(notary)
-                        .addCommand(LockableTokenContract.Commands.Issue((holders.indices).toList()), issuer.owningKey)
+                        .addCommand(Issue((holders.indices).toList()), issuer.owningKey)
                 holders.forEach {
                     builder.addOutputState(
                             LockableTokenState(it.first, issuer, Amount(it.second, LockableTokenType)),
@@ -553,5 +555,181 @@ object LockableTokenFlows {
                 return fetched
             }
         }
+    }
+
+    object Redeem {
+
+        /**
+         * Redeems the tokens from the given holder, and returns a change.
+         * It is started by the player.
+         * Its handler is [Responder].
+         */
+        @InitiatingFlow
+        @StartableByRPC
+        class Initiator(private val states: List<StateAndRef<LockableTokenState>>,
+                        private val change: Long,
+                        override val progressTracker: ProgressTracker = tracker())
+            : FlowLogic<SignedTransaction>() {
+
+            constructor(state: StateAndRef<LockableTokenState>, change: Long)
+                    : this(listOf(state), change)
+
+            constructor(state: StateAndRef<LockableTokenState>, change: Long,
+                        progressTracker: ProgressTracker)
+                    : this(listOf(state), change, progressTracker)
+
+            val notary: Party
+            val holder: AbstractParty
+            val issuer: AbstractParty
+
+            init {
+                require(states.isNotEmpty()) { "The states cannot be empty" }
+                val notaries = states.map { it.state.notary }.distinct()
+                require(notaries.size == 1) {
+                    "The states must be controlled by a single notary"
+                }
+                notary = notaries.single()
+                require(states.none { it.state.data.isLocked }) { "The states must be unlocked" }
+                val holders = states.map { it.state.data.holder!! }.distinct()
+                require(holders.size == 1) {
+                    "The states must be held by a single holder"
+                }
+                holder = holders.single()
+                val issuers = states.map { it.state.data.issuer }.distinct()
+                require(issuers.size == 1) {
+                    "The states must be issued by a single issuer"
+                }
+                issuer = issuers.single()
+            }
+
+            companion object {
+                object GeneratingTransaction : ProgressTracker.Step("Generating transaction.")
+                object VerifyingTransaction : ProgressTracker.Step("Verifying contract constraints.")
+                object SigningTransaction : ProgressTracker.Step("Signing transaction with issuer key.")
+                object SendingHolderInformation : ProgressTracker.Step("Sending issuer information.")
+                object CollectingSigs : ProgressTracker.Step("Collecting Signatures.") {
+                    override fun childProgressTracker() = CollectSignaturesFlow.tracker()
+                }
+
+                object FinalisingTransaction : ProgressTracker.Step("Finalising transaction.") {
+                    override fun childProgressTracker() = FinalityFlow.tracker()
+                }
+
+                fun tracker() = ProgressTracker(
+                        GeneratingTransaction,
+                        VerifyingTransaction,
+                        SigningTransaction,
+                        SendingHolderInformation,
+                        CollectingSigs,
+                        FinalisingTransaction)
+            }
+
+            @Suspendable
+            override fun call(): SignedTransaction {
+                progressTracker.currentStep = GeneratingTransaction
+                val builder = TransactionBuilder(states[0].state.notary)
+                states.forEach { builder.addInputState(it) }
+                if (change == 0L) {
+                    builder.addCommand(Redeem(states.indices.toList(), listOf()),
+                            listOf(holder.owningKey, issuer.owningKey))
+                } else {
+                    builder.addCommand(Redeem(states.indices.toList(), listOf(0)),
+                            listOf(holder.owningKey, issuer.owningKey))
+                            .addOutputState(
+                                    LockableTokenState(holder, issuer, Amount(change, LockableTokenType)),
+                                    LockableTokenContract.id)
+                }
+
+                progressTracker.currentStep = VerifyingTransaction
+                builder.verify(serviceHub)
+
+                progressTracker.currentStep = SigningTransaction
+                val partSigned = serviceHub.signInitialTransaction(builder, holder.owningKey)
+
+                progressTracker.currentStep = SendingHolderInformation
+                val issuerHost = serviceHub.identityService.wellKnownPartyFromAnonymous(issuer)
+                        ?: throw FlowException("Could not resolve issuer")
+                val issuerFlow = if (issuerHost == ourIdentity) null
+                else initiateFlow(issuerHost)
+                issuerFlow?.also { subFlow(SyncKeyMappingFlow(it, listOf(holder))) }
+
+                progressTracker.currentStep = CollectingSigs
+                val signed = issuerFlow
+                        ?.let {
+                            subFlow(CollectSignaturesFlow(
+                                    partSigned,
+                                    listOfNotNull(it),
+                                    listOf(holder.owningKey),
+                                    CollectingSigs.childProgressTracker()))
+                        }
+                        ?: partSigned
+
+                progressTracker.currentStep = FinalisingTransaction
+                return subFlow(FinalityFlow(signed,
+                        listOfNotNull(issuerFlow),
+                        StatesToRecord.ALL_VISIBLE,
+                        FinalisingTransaction.childProgressTracker()))
+
+            }
+        }
+
+        /**
+         * Redeems the issued tokens. Running on the issuer node.
+         */
+        @InitiatedBy(Initiator::class)
+        class Responder(private val issuerSession: FlowSession,
+                        override val progressTracker: ProgressTracker) : FlowLogic<SignedTransaction>() {
+
+            constructor(issuerSession: FlowSession) : this(issuerSession, tracker())
+
+            companion object {
+                object ReceivingHolderInformation : ProgressTracker.Step("Receiving holder information.")
+                object SigningTransaction : ProgressTracker.Step("Signing Transaction.") {
+                    override fun childProgressTracker() = SignTransactionFlow.tracker()
+                }
+
+                object FinalisingTransaction : ProgressTracker.Step("Finalising transaction.")
+
+                fun tracker() = ProgressTracker(
+                        ReceivingHolderInformation,
+                        SigningTransaction,
+                        FinalisingTransaction)
+            }
+
+            @Suspendable
+            override fun call(): SignedTransaction {
+                progressTracker.currentStep = ReceivingHolderInformation
+                subFlow(SyncKeyMappingFlowHandler(issuerSession))
+
+                progressTracker.currentStep = SigningTransaction
+                val txId = subFlow(object : SignTransactionFlow(
+                        issuerSession, SigningTransaction.childProgressTracker()) {
+                    override fun checkTransaction(stx: SignedTransaction) {
+                        val myCommands = stx.tx.commands.filter { command ->
+                            command.signers.any { serviceHub.isLocalKey(it) }
+                        }
+                        if (myCommands.size != 1) throw FlowException("There should be a single command for me")
+                        val myCommand = myCommands[0].value
+                        if (myCommand !is LockableTokenContract.Commands.Redeem)
+                            throw FlowException("My command should only be a Redeem")
+                        val inputs = myCommand.inputIndices.map {
+                            serviceHub.toStateAndRef<LockableTokenState>(stx.inputs[it]).state.data
+                        }
+                        val issuers = inputs.map { it.issuer }.distinct()
+                        if (issuers.size != 1) throw FlowException("There should be a single issuer")
+                        if (!serviceHub.isLocalKey(issuers.single().owningKey))
+                            throw FlowException("The issuer should be local")
+                        val localHolders = inputs.mapNotNull { it.holder?.owningKey }
+                                .filter { serviceHub.isLocalKey(it) }
+                        if (localHolders.isNotEmpty())
+                            throw FlowException("There should be no local holder")
+                    }
+                }).id
+
+                progressTracker.currentStep = FinalisingTransaction
+                return subFlow(ReceiveFinalityFlow(issuerSession, txId))
+            }
+        }
+
     }
 }
