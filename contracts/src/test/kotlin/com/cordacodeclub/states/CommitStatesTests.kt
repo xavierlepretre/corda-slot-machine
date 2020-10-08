@@ -10,6 +10,7 @@ import net.corda.testing.core.TestIdentity
 import org.junit.Test
 import java.util.*
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class CommitStatesTests {
 
@@ -64,5 +65,25 @@ class CommitStatesTests {
         assertContains(IntRange(9_500, 10_500), distribution[10L])
         assertContains(IntRange(85_000, 95_000), distribution[4L])
         assertContains(IntRange(850_000, 900_000), distribution[0L])
+    }
+
+    @Test
+    fun `The house always wins`() {
+        val random = Random()
+        val roundCount = 1_000_000L
+
+        val distribution = (1..roundCount)
+                .map {
+                    CommitImage.playerPayoutCalculator(
+                            CommitImage.createRandom(random), CommitImage.createRandom(random))
+                }
+                .groupBy { it }
+                .mapValues { it.value.size }
+        val playerWinnings = distribution.entries
+                .fold(0L) { sum, entry ->
+                    Math.addExact(sum, Math.multiplyExact(entry.key, entry.value.toLong()))
+                }
+        println("Player $roundCount -> $playerWinnings")
+        assertTrue(playerWinnings < roundCount)
     }
 }
