@@ -228,15 +228,15 @@ SlotMachine.prototype.spin = function () {
     return false;
   }
 
-  // Clean up the UI
-  this.spinning = true;
-  this.showWonState(false);
-  this.disableSpinButton();
-
   // Deduct the bet from the balance
   SlotMachines.balance -= this.curBet;
   SlotMachinesBalanceChange(SlotMachines.balance);
   this.$elOutputBalance.html(SlotMachines.balance);
+
+  // Clean up the UI
+  this.spinning = true;
+  this.showWonState(false);
+  this.disableSpinButton();
 
   // Make the reels spin
   this.startSpinningReels();
@@ -316,6 +316,8 @@ SlotMachine.prototype.endSpinAfterCountersUpdated = function (spinResult) {
 
   if (SlotMachines.balance >= this.curBet) {
     this.enableSpinButton();
+  } else {
+    this.disableSpinButton();
   }
 
   // This is technically redundant, since the payout incrementer updated them, and we decreased it when spinning,
