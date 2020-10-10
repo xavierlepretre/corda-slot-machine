@@ -43,7 +43,8 @@ class ForeClosureFlowTest {
                         TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
                         TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
                         TestCordapp.findCordapp("com.cordacodeclub.contracts"),
-                        TestCordapp.findCordapp("com.cordacodeclub.flows")))
+                        TestCordapp.findCordapp("com.cordacodeclub.flows")
+                                .withConfig(mapOf(GameFlows.Responder.maxPlayerWagerKey to "1000000"))))
                 // To accommodate the schedulable events.
                 .withThreadPerNode(true))
         notaryNode = network.defaultNotaryNode
