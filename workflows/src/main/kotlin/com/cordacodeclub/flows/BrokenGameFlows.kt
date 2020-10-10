@@ -1,6 +1,7 @@
 package com.cordacodeclub.flows
 
 import co.paralleluniverse.fibers.Suspendable
+import com.cordacodeclub.flows.GameFlows.Responder.Companion.getMaxPlayerWager
 import com.cordacodeclub.states.*
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlow
 import com.r3.corda.lib.ci.workflows.SyncKeyMappingFlowHandler
@@ -200,8 +201,9 @@ object BrokenGameFlows {
                 // Receive new game information
                 progressTracker.currentStep = GameFlows.Responder.Companion.ReceivingGameSetup
                 val setup = playerSession.receive<GameFlows.GameSetup>().unwrap { it }
-                if (GameFlows.Responder.maxPlayerWager < setup.playerWager)
-                    throw FlowException("Player wager cannot be more than ${GameFlows.Responder.maxPlayerWager}")
+                val maxPlayerWager = serviceHub.getMaxPlayerWager()
+                if (maxPlayerWager < setup.playerWager)
+                    throw FlowException("Player wager cannot be more than $maxPlayerWager")
                 if (Instant.now().plus(GameParameters.commitDuration) < setup.commitDeadline)
                     throw FlowException("Commit deadline is too far in the future")
                 if (setup.commitDeadline.plus(GameParameters.revealDuration) != setup.revealDeadline)

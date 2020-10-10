@@ -9,6 +9,7 @@ import net.corda.core.flows.*
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.node.ServiceHub
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.utilities.ProgressTracker
@@ -265,8 +266,10 @@ object GameFlows {
         constructor(playerSession: FlowSession) : this(playerSession, tracker())
 
         companion object {
-            // Limit to what the casino will accept to play.
-            const val maxPlayerWager = 100L
+            // Config key of limit to what the casino will accept to play.
+            const val maxPlayerWagerKey = "maxPlayerWager"
+
+            fun ServiceHub.getMaxPlayerWager() = getAppContext().config.getLong(maxPlayerWagerKey)
 
             // Whether to auto issue tokens when not enough tokens can be fetched.
             const val autoIssueWhenPossible = true
@@ -323,6 +326,7 @@ object GameFlows {
             // Receive new game information
             progressTracker.currentStep = ReceivingGameSetup
             val setup = playerSession.receive<GameSetup>().unwrap { it }
+            val maxPlayerWager = serviceHub.getMaxPlayerWager()
             if (maxPlayerWager < setup.playerWager)
                 throw FlowException("Player wager cannot be more than $maxPlayerWager")
             if (Instant.now().plus(GameParameters.commitDuration) < setup.commitDeadline)
