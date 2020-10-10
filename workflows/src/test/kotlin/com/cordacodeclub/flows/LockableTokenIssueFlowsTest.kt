@@ -140,8 +140,6 @@ class LockableTokenIssueFlowsTest {
         issuerNode.startFlow(SyncKeyMappingInitiator(holderNodeParty, listOf(issuer)))
                 .also { network.runNetwork() }
                 .get()
-        val issueTx = holderNode.startFlow(LockableTokenFlows.Issue.InitiatorBeg(
-                LockableTokenFlows.Issue.Request(network.defaultNotaryIdentity, holder1, issuer)))
                 .also { network.runNetwork() }
                 .get()
         val output = issueTx.coreTransaction.outRef<LockableTokenState>(0)
@@ -162,8 +160,8 @@ class LockableTokenIssueFlowsTest {
                 .also { network.runNetwork() }
                 .get()
         val error = assertThrows<FlowException> {
-            otherNode.startFlow(LockableTokenFlows.Issue.InitiatorBeg(
-                    LockableTokenFlows.Issue.Request(network.defaultNotaryIdentity, otherNodeParty, issuer)))
+            otherNode.startFlow(LockableTokenFlows.Beg.Initiator(
+                    LockableTokenFlows.Beg.Request(network.defaultNotaryIdentity, otherNodeParty, issuer)))
                     .also { network.runNetwork() }
                     .getOrThrow()
         }

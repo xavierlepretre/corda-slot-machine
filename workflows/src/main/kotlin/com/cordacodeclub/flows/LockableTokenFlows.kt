@@ -2,9 +2,9 @@ package com.cordacodeclub.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.cordacodeclub.contracts.LockableTokenContract
-import com.cordacodeclub.flows.GetNotaryAndCasino.Companion.getPlayerHost
 import com.cordacodeclub.contracts.LockableTokenContract.Commands.Issue
 import com.cordacodeclub.contracts.LockableTokenContract.Commands.Redeem
+import com.cordacodeclub.flows.GetNotaryAndCasino.Companion.getPlayerHost
 import com.cordacodeclub.schema.LockableTokenSchemaV1
 import com.cordacodeclub.states.LockableTokenState
 import com.cordacodeclub.states.LockableTokenType
@@ -171,16 +171,19 @@ object LockableTokenFlows {
             }
         }
 
+    }
+
+    object Beg {
         @CordaSerializable
         data class Request(val notary: Party,
                            val holder: AbstractParty,
                            val issuer: AbstractParty)
 
         @StartableByRPC
-        class InitiatorBegSimple(private val notary: Party,
-                                 private val holderAccountName: String,
-                                 private val issuer: Party,
-                                 override val progressTracker: ProgressTracker)
+        class InitiatorSimple(private val notary: Party,
+                              private val holderAccountName: String,
+                              private val issuer: Party,
+                              override val progressTracker: ProgressTracker)
             : FlowLogic<SignedTransaction>() {
 
             constructor(notary: Party,
@@ -189,13 +192,13 @@ object LockableTokenFlows {
 
             companion object {
                 object ResolvingHolder : ProgressTracker.Step("Resolving holder.")
-                object PassingOnToInitiatorBeg : ProgressTracker.Step("Passing on to initiator beg.") {
-                    override fun childProgressTracker() = InitiatorBeg.tracker()
+                object PassingOnToInitiator : ProgressTracker.Step("Passing on to initiator.") {
+                    override fun childProgressTracker() = Initiator.tracker()
                 }
 
                 fun tracker() = ProgressTracker(
                         ResolvingHolder,
-                        PassingOnToInitiatorBeg)
+                        PassingOnToInitiator)
             }
 
             @Suspendable
@@ -203,19 +206,19 @@ object LockableTokenFlows {
                 progressTracker.currentStep = ResolvingHolder
                 val holder = getParty(holderAccountName)
 
-                progressTracker.currentStep = PassingOnToInitiatorBeg
-                return subFlow(InitiatorBeg(Request(notary, holder, issuer),
-                        PassingOnToInitiatorBeg.childProgressTracker()))
+                progressTracker.currentStep = PassingOnToInitiator
+                return subFlow(Initiator(Request(notary, holder, issuer),
+                        PassingOnToInitiator.childProgressTracker()))
             }
         }
 
         /**
          * Asks the issuer to get some tokens.
-         * Its handler is [ResponderBeg].
+         * Its handler is [Responder].
          */
         @InitiatingFlow
         @StartableByRPC
-        class InitiatorBeg(private val request: Request, override val progressTracker: ProgressTracker)
+        class Initiator(private val request: Request, override val progressTracker: ProgressTracker)
             : FlowLogic<SignedTransaction>() {
 
             constructor(request: Request) : this(request, tracker())
@@ -224,8 +227,8 @@ object LockableTokenFlows {
                 object ResolvingHolder : ProgressTracker.Step("Resolving holder.")
                 object VerifyingAuthorisation : ProgressTracker.Step("Verifying if authorised.")
                 object ResolvingIssuer : ProgressTracker.Step("Resolving issuer.")
-                object PassingOnToInitiator : ProgressTracker.Step("Passing on to initiator.") {
-                    override fun childProgressTracker() = Initiator.tracker()
+                object PassingOnToIssuerInitiator : ProgressTracker.Step("Passing on to issuer initiator.") {
+                    override fun childProgressTracker() = Issue.Initiator.tracker()
                 }
 
                 object SendingHolderInformation : ProgressTracker.Step("Sending holder information.")
@@ -235,7 +238,7 @@ object LockableTokenFlows {
                         ResolvingHolder,
                         VerifyingAuthorisation,
                         ResolvingIssuer,
-                        PassingOnToInitiator,
+                        PassingOnToIssuerInitiator,
                         SendingHolderInformation,
                         SendingRequestInformation)
             }
@@ -254,9 +257,9 @@ object LockableTokenFlows {
                 val issuerHost = serviceHub.identityService.wellKnownPartyFromAnonymous(request.issuer)
                         ?: throw FlowException("Could not resolve issuer")
                 return if (issuerHost == ourIdentity) {
-                    progressTracker.currentStep = PassingOnToInitiator
-                    subFlow(Initiator(request.notary, request.holder, automaticAmount, request.issuer,
-                            PassingOnToInitiator.childProgressTracker()))
+                    progressTracker.currentStep = PassingOnToIssuerInitiator
+                    subFlow(Issue.Initiator(request.notary, request.holder, Issue.automaticAmount, request.issuer,
+                            PassingOnToIssuerInitiator.childProgressTracker()))
                 } else {
                     progressTracker.currentStep = SendingHolderInformation
                     val issuerSession = initiateFlow(issuerHost)
@@ -268,16 +271,18 @@ object LockableTokenFlows {
             }
         }
 
-        @InitiatedBy(InitiatorBeg::class)
-        class ResponderBeg(private val holderSession: FlowSession,
-                           override val progressTracker: ProgressTracker) : FlowLogic<SignedTransaction>() {
+        @InitiatedBy(Initiator::class)
+        class Responder(private val holderSession: FlowSession,
+                        override val progressTracker: ProgressTracker) : FlowLogic<SignedTransaction>() {
 
             constructor(holderSession: FlowSession) : this(holderSession, tracker())
 
             companion object {
                 object ReceivingHolderInformation : ProgressTracker.Step("Receiving holder information.")
                 object ReceivingRequestInformation : ProgressTracker.Step("Receiving request information.")
-                object PassingOnToInitiator : ProgressTracker.Step("Passing on to initiator.")
+                object PassingOnToInitiator : ProgressTracker.Step("Passing on to initiator.") {
+                    override fun childProgressTracker() = Issue.Initiator.tracker()
+                }
                 object SendingTransactionToHolder : ProgressTracker.Step("Sending transaction to holder.")
 
                 fun tracker() = ProgressTracker(
@@ -295,8 +300,9 @@ object LockableTokenFlows {
                 progressTracker.currentStep = ReceivingRequestInformation
                 val request = holderSession.receive<Request>().unwrap { it }
 
-                progressTracker.currentStep = PassingOnToInitiator
-                val tx = subFlow(Initiator(request.notary, request.holder, automaticAmount, request.issuer))
+                    progressTracker.currentStep = PassingOnToInitiator
+                    subFlow(Issue.Initiator(request.notary, request.holder, Issue.automaticAmount, request.issuer,
+                            PassingOnToInitiator.childProgressTracker()))
 
                 progressTracker.currentStep = SendingTransactionToHolder
                 holderSession.send(tx)
