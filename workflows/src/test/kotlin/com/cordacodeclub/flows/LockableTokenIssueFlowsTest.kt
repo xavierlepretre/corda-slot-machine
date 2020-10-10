@@ -140,6 +140,8 @@ class LockableTokenIssueFlowsTest {
         issuerNode.startFlow(SyncKeyMappingInitiator(holderNodeParty, listOf(issuer)))
                 .also { network.runNetwork() }
                 .get()
+        val issueTx = holderNode.startFlow(LockableTokenFlows.Beg.Initiator(
+                LockableTokenFlows.Beg.Request(network.defaultNotaryIdentity, holder1, issuer)))
                 .also { network.runNetwork() }
                 .get()
         val output = issueTx.coreTransaction.outRef<LockableTokenState>(0)
@@ -166,6 +168,37 @@ class LockableTokenIssueFlowsTest {
                     .getOrThrow()
         }
         assertEquals("Your host is not allowed to beg for tokens", error.message)
+    }
+
+    @Test
+    fun `when beg for tokens instead moves and find tokens in vaults`() {
+        issuerNode.startFlow(SyncKeyMappingInitiator(holderNodeParty, listOf(issuer)))
+                .also { network.runNetwork() }
+                .get()
+        val issueTx = issuerNode.startFlow(LockableTokenFlows.Issue.Initiator(network.defaultNotaryIdentity,
+                issuer, LockableTokenFlows.Issue.automaticAmount, issuer))
+                .also { network.runNetwork() }
+                .get()
+        val moveTx = holderNode.startFlow(LockableTokenFlows.Beg.Initiator(
+                LockableTokenFlows.Beg.Request(network.defaultNotaryIdentity, holder1, issuer)))
+                .also { network.runNetwork() }
+                .get()
+
+        val issued = issueTx.tx.outRef<LockableTokenState>(0)
+
+        assertEquals(1, moveTx.tx.inputs.size)
+        assertEquals(issued.ref, moveTx.tx.inputs.single())
+
+        val output = moveTx.coreTransaction.outRef<LockableTokenState>(0)
+        assertEquals(LockableTokenFlows.Issue.automaticAmount, output.state.data.amount.quantity)
+        for (node in listOf(issuerNode, holderNode)) {
+            assertEquals(moveTx, node.services.validatedTransactions.getTransaction(moveTx.id))
+            val vaultTokens = node.transaction {
+                node.services.vaultService.queryBy(LockableTokenState::class.java).states
+            }
+            assertEquals(1, vaultTokens.size)
+            assertEquals(output, vaultTokens.single())
+        }
     }
 
 }

@@ -224,8 +224,6 @@ object LockableTokenFlows {
             constructor(request: Request) : this(request, tracker())
 
             companion object {
-                object ResolvingHolder : ProgressTracker.Step("Resolving holder.")
-                object VerifyingAuthorisation : ProgressTracker.Step("Verifying if authorised.")
                 object ResolvingIssuer : ProgressTracker.Step("Resolving issuer.")
                 object PassingOnToIssuerInitiator : ProgressTracker.Step("Passing on to issuer initiator.") {
                     override fun childProgressTracker() = Issue.Initiator.tracker()
@@ -235,8 +233,6 @@ object LockableTokenFlows {
                 object SendingRequestInformation : ProgressTracker.Step("Sending request information.")
 
                 fun tracker() = ProgressTracker(
-                        ResolvingHolder,
-                        VerifyingAuthorisation,
                         ResolvingIssuer,
                         PassingOnToIssuerInitiator,
                         SendingHolderInformation,
@@ -245,14 +241,6 @@ object LockableTokenFlows {
 
             @Suspendable
             override fun call(): SignedTransaction {
-                progressTracker.currentStep = ResolvingHolder
-                val holderHost = serviceHub.identityService.wellKnownPartyFromAnonymous(request.holder)
-                        ?: throw FlowException("Could not resolve holder")
-
-                progressTracker.currentStep = VerifyingAuthorisation
-                val allowedHost = serviceHub.getPlayerHost()
-                if (allowedHost != holderHost) throw FlowException("Your host is not allowed to beg for tokens")
-
                 progressTracker.currentStep = ResolvingIssuer
                 val issuerHost = serviceHub.identityService.wellKnownPartyFromAnonymous(request.issuer)
                         ?: throw FlowException("Could not resolve issuer")
@@ -279,15 +267,23 @@ object LockableTokenFlows {
 
             companion object {
                 object ReceivingHolderInformation : ProgressTracker.Step("Receiving holder information.")
+                object VerifyingAuthorisation : ProgressTracker.Step("Verifying if authorised.")
                 object ReceivingRequestInformation : ProgressTracker.Step("Receiving request information.")
+                object TryingMoveFirst : ProgressTracker.Step("Trying a move first.") {
+                    override fun childProgressTracker() = Move.Initiator.tracker()
+                }
+
                 object PassingOnToInitiator : ProgressTracker.Step("Passing on to initiator.") {
                     override fun childProgressTracker() = Issue.Initiator.tracker()
                 }
+
                 object SendingTransactionToHolder : ProgressTracker.Step("Sending transaction to holder.")
 
                 fun tracker() = ProgressTracker(
                         ReceivingHolderInformation,
+                        VerifyingAuthorisation,
                         ReceivingRequestInformation,
+                        TryingMoveFirst,
                         PassingOnToInitiator,
                         SendingTransactionToHolder)
             }
@@ -297,18 +293,31 @@ object LockableTokenFlows {
                 progressTracker.currentStep = ReceivingHolderInformation
                 subFlow(SyncKeyMappingFlowHandler(holderSession))
 
+                progressTracker.currentStep = VerifyingAuthorisation
+                val allowedHost = serviceHub.getPlayerHost()
+                if (allowedHost != holderSession.counterparty) throw FlowException("Your host is not allowed to beg for tokens")
+
                 progressTracker.currentStep = ReceivingRequestInformation
                 val request = holderSession.receive<Request>().unwrap { it }
 
+                val tx = try {
+                    progressTracker.currentStep = TryingMoveFirst
+                    subFlow(Move.Initiator(request.notary,
+                            LockableTokenState(request.holder, request.issuer,
+                                    Amount(Issue.automaticAmount, LockableTokenType)),
+                            TryingMoveFirst.childProgressTracker()))
+                } catch (notEnough: Fetch.NotEnoughTokensException) {
                     progressTracker.currentStep = PassingOnToInitiator
                     subFlow(Issue.Initiator(request.notary, request.holder, Issue.automaticAmount, request.issuer,
                             PassingOnToInitiator.childProgressTracker()))
+                }
 
                 progressTracker.currentStep = SendingTransactionToHolder
                 holderSession.send(tx)
                 return tx
             }
         }
+
     }
 
     object Fetch {
