@@ -738,4 +738,90 @@ object LockableTokenFlows {
         }
 
     }
+
+    object Move {
+
+        // Don't make it startable by RPC for safety.
+        @InitiatingFlow
+        class Initiator(private val notary: Party,
+                        private val toGive: LockableTokenState,
+                        override val progressTracker: ProgressTracker = tracker())
+            : FlowLogic<SignedTransaction>() {
+
+            companion object {
+                object FetchingLocalStates : ProgressTracker.Step("Fetching local states.") {
+                    override fun childProgressTracker() = Fetch.Local.tracker()
+                }
+
+                object GeneratingTransaction : ProgressTracker.Step("Generating transaction.")
+                object VerifyingTransaction : ProgressTracker.Step("Verifying transaction.")
+                object SigningTransaction : ProgressTracker.Step("Signing transaction.")
+                object FinalisingTransaction : ProgressTracker.Step("Finalising transaction.") {
+                    override fun childProgressTracker() = FinalityFlow.tracker()
+                }
+
+                fun tracker() = ProgressTracker(
+                        FetchingLocalStates,
+                        GeneratingTransaction,
+                        VerifyingTransaction,
+                        SigningTransaction,
+                        FinalisingTransaction)
+            }
+
+            @Suspendable
+            override fun call(): SignedTransaction {
+                progressTracker.currentStep = FetchingLocalStates
+                val inputStates = subFlow(Fetch.Local(
+                        toGive.issuer, toGive.issuer, Issue.automaticAmount,
+                        currentTopLevel?.runId?.uuid ?: throw FlowException("No running id"),
+                        FetchingLocalStates.childProgressTracker()))
+                val ownSum = inputStates
+                        .fold(Amount(0L, LockableTokenType)) { sum, it ->
+                            sum + it.state.data.amount
+                        }
+                val holderSum = Amount(Issue.automaticAmount, LockableTokenType)
+                val outputStates = listOfNotNull(
+                        toGive,
+                        if (holderSum < ownSum)
+                            LockableTokenState(toGive.issuer, toGive.issuer, ownSum - holderSum)
+                        else
+                            null)
+
+                progressTracker.currentStep = GeneratingTransaction
+                val builder = TransactionBuilder(notary)
+                val inputIndices = inputStates.map { state ->
+                    builder.addInputState(state)
+                    builder.inputStates().size - 1
+                }
+                val outputIndices = outputStates.map { state ->
+                    builder.addOutputState(state, LockableTokenContract.id)
+                    builder.outputStates().size - 1
+                }
+                builder.addCommand(
+                        LockableTokenContract.Commands.Move(inputIndices, outputIndices),
+                        toGive.issuer.owningKey)
+
+                progressTracker.currentStep = VerifyingTransaction
+                builder.verify(serviceHub)
+
+                progressTracker.currentStep = SigningTransaction
+                val signed = serviceHub.signInitialTransaction(builder, toGive.issuer.owningKey)
+
+                progressTracker.currentStep = FinalisingTransaction
+                val participantSessions = listOf(toGive.holder!!)
+                        .map { serviceHub.identityService.requireWellKnownPartyFromAnonymous(it) }
+                        .filter { it != ourIdentity }
+                        .distinct()
+                        .map { initiateFlow(it) }
+                return subFlow(FinalityFlow(signed, participantSessions,
+                        StatesToRecord.ALL_VISIBLE, FinalisingTransaction.childProgressTracker()))
+            }
+        }
+
+        @InitiatedBy(Initiator::class)
+        class Responder(private val issuerSession: FlowSession) : FlowLogic<SignedTransaction>() {
+            @Suspendable
+            override fun call() = subFlow(ReceiveFinalityFlow(issuerSession))
+        }
+    }
 }
