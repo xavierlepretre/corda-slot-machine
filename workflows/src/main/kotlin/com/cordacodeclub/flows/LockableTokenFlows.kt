@@ -570,6 +570,82 @@ object LockableTokenFlows {
                 return fetched
             }
         }
+
+        data class HolderSummary(
+                val unlocked: Map<AbstractParty, Amount<LockableTokenType>>,
+                val locked: Amount<LockableTokenType>)
+
+        data class IssuerSummary(val all: Map<AbstractParty, HolderSummary>) {
+            companion object {
+                fun from(unlocked: Map<AbstractParty, Map<AbstractParty, Amount<LockableTokenType>>>,
+                         locked: Map<AbstractParty, Amount<LockableTokenType>>): IssuerSummary {
+                    return (unlocked.keys + locked.keys)
+                            .map { key ->
+                                key to HolderSummary(
+                                        unlocked[key] ?: mapOf(),
+                                        locked[key] ?: Amount(0, LockableTokenType))
+                            }
+                            .toMap()
+                            .let { IssuerSummary(it) }
+                }
+            }
+        }
+
+        /**
+         * Fetches all tokens and classifies them by returning sums.
+         */
+        @StartableByRPC
+        class LocalAll(override val progressTracker: ProgressTracker) : FlowLogic<IssuerSummary>() {
+
+            constructor() : this(LocalAll.tracker())
+
+            companion object {
+                object PreparingCriteria : ProgressTracker.Step("Preparing criteria.")
+                object QueryingVault : ProgressTracker.Step("Querying vault.")
+                object ReturningResult : ProgressTracker.Step("Returning Result.")
+
+                fun tracker() = ProgressTracker(PreparingCriteria, QueryingVault, ReturningResult)
+            }
+
+            @Suspendable
+            override fun call(): IssuerSummary {
+                progressTracker.currentStep = PreparingCriteria
+                val criteria = QueryCriteria.VaultQueryCriteria(
+                        contractStateTypes = setOf(LockableTokenState::class.java),
+                        relevancyStatus = Vault.RelevancyStatus.RELEVANT,
+                        status = Vault.StateStatus.UNCONSUMED
+                )
+
+                progressTracker.currentStep = QueryingVault
+                var pageNumber = DEFAULT_PAGE_NUM
+                val unlocked = mutableMapOf<AbstractParty, Map<AbstractParty, Amount<LockableTokenType>>>()
+                val locked = mutableMapOf<AbstractParty, Amount<LockableTokenType>>()
+                do {
+                    val pageSpec = PageSpecification(pageNumber = pageNumber, pageSize = Fetch.PAGE_SIZE_DEFAULT)
+                    val results: Vault.Page<LockableTokenState> = serviceHub.vaultService.queryBy(
+                            LockableTokenState::class.java, criteria, pageSpec)
+                    for (ref in results.states) {
+                        val state = ref.state.data
+                        val holder = state.holder
+                        if (holder == null) {
+                            val issuerAmount = (locked[state.issuer] ?: Amount(0, LockableTokenType)) +
+                                    state.amount
+                            locked[state.issuer] = issuerAmount
+                        } else {
+                            val issuerMap = (unlocked[state.issuer] ?: mutableMapOf()) as MutableMap
+                            val holderAmount = (issuerMap[holder] ?: Amount(0, LockableTokenType)) +
+                                    state.amount
+                            issuerMap[holder] = holderAmount
+                            unlocked[state.issuer] = issuerMap
+                        }
+                    }
+                    pageNumber++
+                } while ((pageSpec.pageSize * (pageNumber - 1)) <= results.totalStatesAvailable)
+
+                progressTracker.currentStep = ReturningResult
+                return IssuerSummary.from(unlocked.toMap(), locked.toMap())
+            }
+        }
     }
 
     object Redeem {
