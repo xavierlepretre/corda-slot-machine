@@ -35,8 +35,8 @@ class Controller(rpc: NodeRPCConnection) {
             val player = proxy.startFlow(UserAccountFlows.Create::Initiator, name)
                     .returnValue.getOrThrow()
                     .second
-            proxy.startFlow(LockableTokenFlows.Issue::InitiatorBeg,
-                    LockableTokenFlows.Issue.Request(quickConfig.notary, player, quickConfig.casinoHost))
+            proxy.startFlow(LockableTokenFlows.Beg::Initiator,
+                    LockableTokenFlows.Beg.Request(quickConfig.notary, player, quickConfig.casinoHost))
                     .returnValue.getOrThrow()
             val balance = proxy.startFlow(LockableTokenFlows.Balance::Local, player, quickConfig.casinoHost)
                     .returnValue.getOrThrow()

@@ -65,6 +65,20 @@ class LockableTokenContract : Contract {
         }
 
         /**
+         * A [Move] indicates that some of the inputs tokens are changing hands. The sums don't change.
+         * It only deals with unlocked tokens.
+         */
+        data class Move(override val inputIndices: List<Int>,
+                          override val outputIndices: List<Int>) : Commands(), HasInputs, HasOutputs {
+            init {
+                require(inputIndices.isNotEmpty()) { "Move must have inputs" }
+                require(inputIndices.all { 0 <= it }) { "All input indices must be positive" }
+                require(outputIndices.isNotEmpty()) { "Move must have outputs" }
+                require(outputIndices.all { 0 <= it }) { "All output indices must be positive" }
+            }
+        }
+
+        /**
          * A [Redeem] indicates that some of the inputs tokens are being destroyed. In effect that there are more tokens
          * in inputs than there an in outputs. It only deals with unlocked tokens.
          */
@@ -152,6 +166,18 @@ class LockableTokenContract : Contract {
                     "The sums must be unchanged" using (inputSum == outputSum)
                     "The locked sums must decrease" using (lockedOutputSum < lockedInputSum)
                     "The unlocked input holders must sign" using command.signers
+                            .containsAll(inputs.mapNotNull { it.holder?.owningKey })
+                    // No check on issuer signatures.
+                }
+                is Move -> {
+                    "The inputs must have a single issuer" using (inputIssuers.size == 1)
+                    "The outputs must have a single issuer" using (outputIssuers.size == 1)
+                    "The input and output issuers must be the same" using (inputIssuers.single() == outputIssuers.single())
+                    "The inputs must be unlocked" using inputs.all { !it.isLocked }
+                    "The outputs must be unlocked" using outputs.all { !it.isLocked }
+                    "The sums must be unchanged" using (inputSum == outputSum)
+                    // No check on locked sums.
+                    "The input holders must sign" using command.signers
                             .containsAll(inputs.mapNotNull { it.holder?.owningKey })
                     // No check on issuer signatures.
                 }

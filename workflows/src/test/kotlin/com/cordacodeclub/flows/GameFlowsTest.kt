@@ -1,5 +1,6 @@
 package com.cordacodeclub.flows
 
+import com.cordacodeclub.flows.GameFlows.Responder.Companion.maxPlayerWagerKey
 import com.cordacodeclub.states.GameState
 import com.cordacodeclub.states.LockableTokenState
 import com.r3.corda.lib.accounts.workflows.flows.CreateAccount
@@ -41,7 +42,8 @@ class GameFlowsTest {
                         TestCordapp.findCordapp("com.r3.corda.lib.accounts.workflows"),
                         TestCordapp.findCordapp("com.r3.corda.lib.ci.workflows"),
                         TestCordapp.findCordapp("com.cordacodeclub.contracts"),
-                        TestCordapp.findCordapp("com.cordacodeclub.flows"))))
+                        TestCordapp.findCordapp("com.cordacodeclub.flows")
+                                .withConfig(mapOf(maxPlayerWagerKey to "1000000")))))
         notaryParty = network.defaultNotaryIdentity
         issuerNode = network.createPartyNode()
         issuerNodeParty = issuerNode.info.legalIdentities.first()
